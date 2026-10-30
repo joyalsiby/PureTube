@@ -102,7 +102,7 @@ jobs:
 
           if gh release view "$TAG_NAME" >/dev/null 2>&1; then
             echo "Updating existing release $TAG_NAME..."
-            gh release edit "$TAG_NAME" --title "$TITLE" --notes-file release_notes.md
+            gh release edit "$TAG_NAME" --title "$TITLE" --notes-file release_notes.md --draft=false --latest
             # Delete any leftover -debug.apk assets if present
             for old_asset in $(gh release view "$TAG_NAME" --json assets -q '.assets[].name' | grep -E '\-debug\.apk$' || true); do
               gh release delete-asset "$TAG_NAME" "$old_asset" --yes || true
@@ -110,5 +110,5 @@ jobs:
             gh release upload "$TAG_NAME" "$APK_FILE" --clobber
           else
             echo "Creating new release $TAG_NAME..."
-            gh release create "$TAG_NAME" "$APK_FILE" --title "$TITLE" --notes-file release_notes.md --generate-notes
+            gh release create "$TAG_NAME" "$APK_FILE" --title "$TITLE" --notes-file release_notes.md --latest
           fi

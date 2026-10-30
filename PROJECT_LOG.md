@@ -207,6 +207,37 @@ This document tracks everything built, configured, and improved in the **PureTub
 
 ---
 
+## v0.3.011 — Media Notification Banner & Control Panel Indicator, Closeable PiP (Bg Play Off by Default), Toddler-Proof Screen Unlock, Playlists, Long-Press 2x Speed, Single-Video Loop, Smart Clipboard Card & History Search
+
+1. **Media Notification Banner, Quick Settings Control Panel Indicator & Closeable PiP ([`MediaPlaybackNotificationManager.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/player/MediaPlaybackNotificationManager.kt), [`VideoPlayerScreen.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/player/VideoPlayerScreen.kt), [`MainActivity.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/MainActivity.kt), [`AppPreferences.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/data/AppPreferences.kt)):**
+   - **Background Play OFF by Default:** Changed `backgroundPlayEnabled` default to `false` (`background_play_v2`).
+   - **Auto-PiP When Leaving App & Closeable PiP Like YouTube:** When the app is minimized while playing (not fully closed), Picture-in-Picture (`autoPipOnHome = true`) launches automatically with `-10s`, `Play/Pause`, and `+10s` remote controls on the floating PiP window. Closing/dismissing the PiP window (`X` or swipe down) when Background Play is OFF immediately pauses playback just like YouTube.
+   - **Android MediaSession & Notification Banner:** Integrated `androidx.media3:media3-session` (`MediaSession`) and `NotificationCompat` media notification banner with video title, channel name, artwork metadata, seekbar, `-10s`, `Play/Pause`, `+10s`, and `Close` actions in Android's Quick Settings Media Control Panel & lockscreen.
+
+2. **Toddler-Proof Kids Screen Unlock (`Hold 2s` or `Parent Math Challenge`) ([`VideoPlayerScreen.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/player/VideoPlayerScreen.kt), [`SettingsScreen.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/screens/SettingsScreen.kt), [`AppPreferences.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/data/AppPreferences.kt)):**
+   - Upgraded the locked screen pill (`KidsUnlockMode`) so toddlers cannot unlock by a single accidental tap:
+     - **Hold for 2 Seconds (Default):** Requires continuously pressing and holding the `"Screen locked · Hold 2s to unlock"` pill for 2.0 seconds with a live red progress bar inside the pill.
+     - **Parent Math Challenge:** Tapping the locked pill opens a Parent Unlock Gate multiplication dialog (`a × b = ?`) with 4 choices.
+     - **Single Tap:** Classic single-tap unlock option configurable in **Settings -> Kids Screen Unlock Method**.
+
+3. **Single-Video Loop (`Repeat` Toggle) ([`VideoPlayerScreen.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/player/VideoPlayerScreen.kt)):**
+   - Added a **Loop video** (`Player.REPEAT_MODE_ONE` vs `REPEAT_MODE_OFF`) toggle accessible from the portrait action chips, fullscreen bottom quick-actions strip, and the unified Settings (`⚙️`) bottom sheet.
+
+4. **Long-Press for `2x` Speed Gesture ([`VideoPlayerScreen.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/player/VideoPlayerScreen.kt)):**
+   - Pressing and holding anywhere on the playing video temporarily boosts playback speed to `2.0x` with a top-center **`2x Speed ⏩`** indicator pill, automatically restoring normal speed on finger release.
+
+5. **YouTube Playlist Link Support & In-Player Queue Sheet ([`YoutubeStreamExtractor.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/extractor/YoutubeStreamExtractor.kt), [`MainViewModel.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/MainViewModel.kt), [`VideoPlayerScreen.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/player/VideoPlayerScreen.kt)):**
+   - Sharing or pasting a YouTube playlist URL (`youtube.com/playlist?list=...` or `watch?v=...&list=...`) extracts the playlist items via `NewPipeExtractor`, plays videos sequentially with auto-advance, and adds Previous/Next controls + a **Playlist Queue** bottom sheet—still with zero external recommendations.
+
+6. **Smart Clipboard Detection Card on Watch Screen ([`WatchHomeScreen.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/screens/WatchHomeScreen.kt)):**
+   - Automatically detects a copied YouTube video or playlist link in the system clipboard when opening/resuming the Watch screen and presents a 1-tap **"Play Now"** / **"Paste Link"** card.
+
+7. **Watch History Search & Filter Chips ([`HistoryScreen.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/screens/HistoryScreen.kt)):**
+   - Added a search bar (filtering by video title or channel name) and filter chips (`All`, `In Progress`, `Completed`) to the History screen.
+   - Bumped version to **`v0.3.011`** (`versionCode = 14`, `versionName = "0.3.011"`).
+
+---
+
 ## v0.3.010 — Media Notification Banner & Control Panel Indicator, Closeable PiP (Bg Play Off by Default), Toddler-Proof Screen Unlock, Playlists, Long-Press 2x Speed, Single-Video Loop, Smart Clipboard Card & History Search
 
 1. **Media Notification Banner, Quick Settings Control Panel Indicator & Closeable PiP ([`MediaPlaybackNotificationManager.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/player/MediaPlaybackNotificationManager.kt), [`VideoPlayerScreen.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/player/VideoPlayerScreen.kt), [`MainActivity.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/MainActivity.kt), [`AppPreferences.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/data/AppPreferences.kt)):**

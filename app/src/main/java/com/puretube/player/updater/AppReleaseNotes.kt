@@ -91,7 +91,7 @@ object AppReleaseNotes {
 
     val allReleases: List<VersionReleaseNote> = listOf(
         VersionReleaseNote(
-            versionName = "0.3.010",
+            versionName = "0.3.011",
             title = "Media Notification & Closeable PiP, Playlists, Toddler Lock, 2x Hold & More",
             summary = "YouTube-style media notification & control panel playing indicator, closeable PiP with Background Play off by default, toddler-proof screen unlock, playlists, 2x speed hold, loop toggle, clipboard card & history search.",
             highlights = listOf(
@@ -119,6 +119,18 @@ object AppReleaseNotes {
                     icon = Icons.Rounded.ContentPaste,
                     title = "Smart Clipboard Card & Watch History Search/Filter",
                     description = "Auto-detects copied YouTube links on the Watch screen with a 1-tap Play Now card, plus search & filter chips (All, In Progress, Completed) in History."
+                )
+            )
+        ),
+        VersionReleaseNote(
+            versionName = "0.3.010",
+            title = "Media Notification & Closeable PiP, Playlists, Toddler Lock, 2x Hold & More",
+            summary = "Initial release of media notification, closeable PiP, toddler lock, playlist links, 2x hold, loop toggle, clipboard card, and history search.",
+            highlights = listOf(
+                ReleaseHighlightItem(
+                    icon = Icons.Rounded.NotificationsActive,
+                    title = "Media Controls & Toddler Lock",
+                    description = "All v0.3.010 core features integrated."
                 )
             )
         ),
