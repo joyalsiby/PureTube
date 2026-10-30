@@ -14,12 +14,18 @@ android {
         minSdk = 24
         targetSdk = 35
         // Version format: X.X.XXX (increment the 3-digit patch number unless 1st/2nd part is explicitly requested)
-        versionCode = 9
-        versionName = "0.3.006"
+        versionCode = 10
+        versionName = "0.3.007"
 
         vectorDrawables {
             useSupportLibrary = true
         }
+    }
+
+    dependenciesInfo {
+        // Disables Google dependency metadata blob for F-Droid & reproducible FOSS builds
+        includeInApk = false
+        includeInBundle = false
     }
 
     signingConfigs {

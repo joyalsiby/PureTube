@@ -146,3 +146,26 @@ This document tracks everything built, configured, and improved in the **PureTub
    - **Background Audio Play:** Enabled by default (`Bg Play: On` chip & toggle in `⚙️` Settings). Configures `ExoPlayer` with `C.WAKE_MODE_NETWORK` and `AudioAttributes` (`handleAudioFocus = true`) and keeps audio playing when the screen is turned off or the app is backgrounded.
    - **Picture-in-Picture (PiP) Mode:** Enabled `android:supportsPictureInPicture="true"` on `MainActivity`, auto-enters 16:9 PiP mode in `onUserLeaveHint()` when pressing Home while watching a video (plus manual `PiP` buttons in the top bar, portrait chips, and Settings sheet), and hides overlays/details while in PiP mode.
    - Bumped version to **`v0.3.006`** (`versionCode = 9`, `versionName = "0.3.006"`) and exported [`PureTube-v0.3.006-debug.apk`](file:///f:/Youtube%20Video%20watching%20app/PureTube-v0.3.006-debug.apk) and [`PureTube-debug.apk`](file:///f:/Youtube%20Video%20watching%20app/PureTube-debug.apk).
+
+
+---
+
+## v0.3.007 — In-App Release Updater, Bottom Nav Settings Tab, Kids & Focus Parental Controls, & F-Droid Readiness
+
+1. **In-App GitHub Release Notifier & 1-Tap APK Updater ([`AppUpdateManager.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/updater/AppUpdateManager.kt), [`file_paths.xml`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/res/xml/file_paths.xml), [`AndroidManifest.xml`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/AndroidManifest.xml), [`MainViewModel.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/MainViewModel.kt)):**
+   - Automatically checks `joyalsiby/PureTube` GitHub Releases on startup (configurable) and via manual check in Settings.
+   - Displays an **Update Available** dialog with release notes, a top banner on the Watch home screen, and a notification badge on the Settings tab icon.
+   - Downloads the new APK directly inside the app with a live percentage progress bar and launches Android's native package installer via `FileProvider` (`REQUEST_INSTALL_PACKAGES`) for seamless in-place upgrades.
+
+2. **Settings Tab in Bottom Navigation Bar ([`SettingsScreen.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/screens/SettingsScreen.kt), [`AppPreferences.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/data/AppPreferences.kt), [`MainActivity.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/MainActivity.kt)):**
+   - Added a 3rd **Settings** tab (`Watch`, `History`, `Settings`) to the Material 3 bottom navigation bar.
+   - **Kids & Focus Mode (Parental Controls):**
+     - **Start videos with Kids Screen Lock:** Automatically locks player controls when a video opens so toddlers cannot accidentally tap out or scrub.
+     - **Auto-enter Fullscreen on play:** Launches videos directly in landscape fullscreen.
+     - **Minimal Distraction-Free Watch Page:** Option to hide video descriptions and view/like stats below the player.
+     - **Set PureTube as Default Link Handler:** One-tap shortcut to Android's "Open by default" settings.
+   - **Playback, Appearance, Privacy & About:** Default startup resolution (`4K` down to `360p`), default playback speed, Background Play & Auto-PiP toggles, Theme selector (`System` / `Dark` / `Light`) + Material You Dynamic Color toggle, History saving toggle, and About & GitHub links.
+
+3. **F-Droid Compliance & Redesigned README ([`README.md`](file:///f:/Youtube%20Video%20watching%20app/README.md), [`LICENSE`](file:///f:/Youtube%20Video%20watching%20app/LICENSE), [`fastlane/`](file:///f:/Youtube%20Video%20watching%20app/fastlane/metadata/android/en-US/full_description.txt), [`app/build.gradle.kts`](file:///f:/Youtube%20Video%20watching%20app/app/build.gradle.kts)):**
+   - Disabled Google's proprietary dependency metadata block (`dependenciesInfo { includeInApk = false; includeInBundle = false }`), added an `MIT` [`LICENSE`](file:///f:/Youtube%20Video%20watching%20app/LICENSE), and added Fastlane metadata for F-Droid / IzzyOnDroid submission.
+   - Bumped version to **`v0.3.007`** (`versionCode = 10`, `versionName = "0.3.007"`).

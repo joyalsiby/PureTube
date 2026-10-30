@@ -4,6 +4,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Link
+import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -35,10 +37,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.platform.LocalContext
@@ -50,12 +54,15 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.puretube.player.updater.ReleaseUpdateInfo
 
 @Composable
 fun WatchHomeScreen(
     inputUrl: String,
     isLoading: Boolean,
     errorMessage: String?,
+    availableUpdate: ReleaseUpdateInfo? = null,
+    onUpdateBannerClick: () -> Unit = {},
     onUrlChange: (String) -> Unit,
     onWatchClick: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -69,6 +76,37 @@ fun WatchHomeScreen(
             .padding(horizontal = 24.dp),
         contentAlignment = Alignment.Center
     ) {
+        // Optional top Update Available Banner
+        if (availableUpdate != null) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 12.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable(onClick = onUpdateBannerClick),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.primaryContainer
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.NewReleases,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "New update v${availableUpdate.versionName} available · Tap to install",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+        }
+
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -90,7 +128,7 @@ fun WatchHomeScreen(
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text = "Paste a YouTube link to watch with zero ads",
+                text = "Share or paste a YouTube link for distraction-free, ad-free viewing",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -244,7 +282,7 @@ fun WatchHomeScreen(
         // Subtle version indicator at the bottom of the screen (vX.X.XXX format)
         val versionName = runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        }.getOrNull() ?: "0.3.006"
+        }.getOrNull() ?: "0.3.007"
 
         Text(
             text = "v$versionName",
@@ -258,12 +296,11 @@ fun WatchHomeScreen(
 }
 
 @Composable
-private fun PureTubeShieldLogo(
-    modifier: Modifier = Modifier
+fun PureTubeShieldLogo(
+    modifier: Modifier = Modifier.size(84.dp)
 ) {
     Canvas(
         modifier = modifier
-            .size(84.dp)
             .semantics {
                 contentDescription = "PureTube Logo"
             }

@@ -186,6 +186,9 @@ fun VideoPlayerScreen(
     backgroundPlayEnabled: Boolean = true,
     isInPipMode: Boolean = false,
     initialSeekPositionMs: Long,
+    initialFullscreenLandscape: Boolean = false,
+    initialControlsLocked: Boolean = false,
+    hideVideoDescription: Boolean = false,
     onSelectQuality: (VideoQualityOption, Long) -> Unit,
     onSelectAudioTrack: (AudioTrackOption, Long) -> Unit,
     onSelectCaption: (CaptionOption?, Long) -> Unit,
@@ -211,9 +214,9 @@ fun VideoPlayerScreen(
     var scrubPositionFraction by remember { mutableFloatStateOf(0f) }
 
     var controlsVisible by remember { mutableStateOf(true) }
-    var isFullscreenLandscape by remember { mutableStateOf(false) }
+    var isFullscreenLandscape by remember { mutableStateOf(initialFullscreenLandscape) }
     var isZoomedToFill by remember { mutableStateOf(false) }
-    var isControlsLocked by remember { mutableStateOf(false) }
+    var isControlsLocked by remember { mutableStateOf(initialControlsLocked) }
 
     var showSettingsSheet by remember { mutableStateOf(false) }
     var showQualitySheet by remember { mutableStateOf(false) }
@@ -1671,6 +1674,7 @@ fun VideoPlayerScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // YouTube-style Expandable Video Description Card with Clickable Timestamps
+                if (!hideVideoDescription) {
                 Surface(
                     onClick = { isDescriptionExpanded = !isDescriptionExpanded },
                     shape = RoundedCornerShape(12.dp),
@@ -1766,6 +1770,7 @@ fun VideoPlayerScreen(
                             )
                         }
                     }
+                }
                 }
             }
         }

@@ -11,18 +11,39 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.PlayCircle
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.PlayCircle
+import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -31,12 +52,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import com.puretube.player.data.AppThemeMode
 import com.puretube.player.extractor.YoutubeStreamExtractor
 import com.puretube.player.ui.MainViewModel
 import com.puretube.player.ui.player.VideoPlayerScreen
 import com.puretube.player.ui.screens.HistoryScreen
+import com.puretube.player.ui.screens.SettingsScreen
 import com.puretube.player.ui.screens.WatchHomeScreen
 import com.puretube.player.ui.theme.PureTubeTheme
+import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
 
@@ -52,7 +78,18 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            PureTubeTheme {
+            val appSettings by viewModel.appSettings.collectAsState()
+            val systemDark = isSystemInDarkTheme()
+            val useDarkTheme = when (appSettings.themeMode) {
+                AppThemeMode.SYSTEM -> systemDark
+                AppThemeMode.DARK -> true
+                AppThemeMode.LIGHT -> false
+            }
+
+            PureTubeTheme(
+                darkTheme = useDarkTheme,
+                dynamicColor = appSettings.dynamicColorEnabled
+            ) {
                 PureTubeApp(
                     viewModel = viewModel,
                     isInPipMode = isInPipModeState,
@@ -71,7 +108,7 @@ class MainActivity : ComponentActivity() {
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
         // Automatically enter Picture-in-Picture (PiP) mode when pressing Home while watching a video
-        if (viewModel.uiState.value.activeVideo != null) {
+        if (viewModel.uiState.value.activeVideo != null && viewModel.appSettings.value.autoPipOnHome) {
             enterPipIfSupported()
         }
     }
@@ -122,6 +159,7 @@ fun PureTubeApp(
     onRequestPipMode: () -> Boolean = { false }
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val appSettings by viewModel.appSettings.collectAsState()
     val historyItems by viewModel.watchHistory.collectAsState()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
 
@@ -137,6 +175,9 @@ fun PureTubeApp(
             backgroundPlayEnabled = uiState.backgroundPlayEnabled,
             isInPipMode = isInPipMode,
             initialSeekPositionMs = uiState.initialSeekPositionMs,
+            initialFullscreenLandscape = appSettings.autoFullscreenOnPlay,
+            initialControlsLocked = appSettings.autoStartKidsLocked,
+            hideVideoDescription = appSettings.hideVideoDescription,
             onSelectQuality = { quality, currentPos ->
                 viewModel.selectQuality(quality, currentPos)
             },
@@ -161,6 +202,99 @@ fun PureTubeApp(
             }
         )
         return
+    }
+
+    // In-App Update Notification Dialog
+    val availableUpdate = uiState.availableUpdate
+    if (uiState.showUpdateDialog && availableUpdate != null) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!uiState.isDownloadingUpdate) {
+                    viewModel.dismissUpdateDialog(skipThisVersion = false)
+                }
+            },
+            icon = {
+                Icon(
+                    imageVector = Icons.Rounded.NewReleases,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = {
+                Text(
+                    text = "Update Available (v${availableUpdate.versionName})",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 280.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        text = availableUpdate.releaseTitle,
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    if (availableUpdate.releaseNotes.isNotBlank()) {
+                        Text(
+                            text = availableUpdate.releaseNotes,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Text(
+                            text = "A new version of PureTube is ready to download and install directly over your current app.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
+                    if (uiState.isDownloadingUpdate) {
+                        Spacer(modifier = Modifier.height(16.dp))
+                        val pct = (uiState.updateDownloadProgress * 100f).roundToInt().coerceIn(0, 100)
+                        LinearProgressIndicator(
+                            progress = { uiState.updateDownloadProgress.coerceIn(0f, 1f) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(6.dp)
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Downloading update... $pct%",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.downloadAndInstallUpdate() },
+                    enabled = !uiState.isDownloadingUpdate
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.CloudDownload,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(if (uiState.isDownloadingUpdate) "Downloading..." else "Download & Update")
+                }
+            },
+            dismissButton = {
+                if (!uiState.isDownloadingUpdate) {
+                    TextButton(
+                        onClick = { viewModel.dismissUpdateDialog(skipThisVersion = false) }
+                    ) {
+                        Text("Later")
+                    }
+                }
+            }
+        )
     }
 
     Scaffold(
@@ -189,6 +323,25 @@ fun PureTubeApp(
                     },
                     label = { Text("History") }
                 )
+                NavigationBarItem(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    icon = {
+                        BadgedBox(
+                            badge = {
+                                if (availableUpdate != null) {
+                                    Badge()
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = if (selectedTab == 2) Icons.Rounded.Settings else Icons.Outlined.Settings,
+                                contentDescription = "Settings"
+                            )
+                        }
+                    },
+                    label = { Text("Settings") }
+                )
             }
         }
     ) { innerPadding ->
@@ -197,6 +350,8 @@ fun PureTubeApp(
                 inputUrl = uiState.inputUrl,
                 isLoading = uiState.isLoading,
                 errorMessage = uiState.errorMessage,
+                availableUpdate = availableUpdate,
+                onUpdateBannerClick = { viewModel.openUpdateDialog() },
                 onUrlChange = viewModel::onUrlChanged,
                 onWatchClick = { url -> viewModel.loadAndPlayUrl(url) },
                 modifier = Modifier.padding(innerPadding)
@@ -211,6 +366,30 @@ fun PureTubeApp(
                 },
                 onDeleteHistoryItem = viewModel::deleteHistoryItem,
                 onClearAllHistory = viewModel::clearAllHistory,
+                modifier = Modifier.padding(innerPadding)
+            )
+            2 -> SettingsScreen(
+                settings = appSettings,
+                historyCount = historyItems.size,
+                availableUpdate = availableUpdate,
+                isCheckingForUpdate = uiState.isCheckingForUpdate,
+                isDownloadingUpdate = uiState.isDownloadingUpdate,
+                updateDownloadProgress = uiState.updateDownloadProgress,
+                updateStatusMessage = uiState.updateStatusMessage,
+                onCheckForUpdate = { viewModel.checkForAppUpdates(manual = true) },
+                onDownloadAndInstallUpdate = { viewModel.downloadAndInstallUpdate() },
+                onUpdateThemeMode = viewModel::updateThemeMode,
+                onUpdateDynamicColor = viewModel::updateDynamicColor,
+                onUpdateDefaultQuality = viewModel::updateDefaultQualityHeight,
+                onUpdateDefaultSpeed = viewModel::updateDefaultPlaybackSpeed,
+                onUpdateBackgroundPlay = viewModel::setBackgroundPlayEnabled,
+                onUpdateAutoPip = viewModel::updateAutoPipOnHome,
+                onUpdateAutoStartKidsLocked = viewModel::updateAutoStartKidsLocked,
+                onUpdateAutoFullscreen = viewModel::updateAutoFullscreenOnPlay,
+                onUpdateHideDescription = viewModel::updateHideVideoDescription,
+                onUpdateSaveHistory = viewModel::updateSaveWatchHistory,
+                onUpdateAutoCheckUpdates = viewModel::updateAutoCheckUpdates,
+                onClearHistory = viewModel::clearAllHistory,
                 modifier = Modifier.padding(innerPadding)
             )
         }

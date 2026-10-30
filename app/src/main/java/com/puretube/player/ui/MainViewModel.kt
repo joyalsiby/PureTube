@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.puretube.player.PureTubeApplication
+import com.puretube.player.data.AppSettings
+import com.puretube.player.data.AppThemeMode
 import com.puretube.player.data.WatchHistoryEntity
 import com.puretube.player.extractor.AudioTrackOption
 import com.puretube.player.extractor.CaptionOption
@@ -11,6 +13,8 @@ import com.puretube.player.extractor.ExtractedVideo
 import com.puretube.player.extractor.VideoQualityOption
 import com.puretube.player.extractor.YoutubeStreamExtractor
 import com.puretube.player.extractor.YoutubeStreamPreloader
+import com.puretube.player.updater.AppUpdateManager
+import com.puretube.player.updater.ReleaseUpdateInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -18,6 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
 
 data class MainUiState(
     val inputUrl: String = "",
@@ -29,19 +34,42 @@ data class MainUiState(
     val selectedCaption: CaptionOption? = null,
     val playbackSpeed: Float = 1.0f,
     val backgroundPlayEnabled: Boolean = true,
-    val initialSeekPositionMs: Long = 0L
+    val initialSeekPositionMs: Long = 0L,
+    // Update Manager State
+    val availableUpdate: ReleaseUpdateInfo? = null,
+    val showUpdateDialog: Boolean = false,
+    val isCheckingForUpdate: Boolean = false,
+    val updateStatusMessage: String? = null,
+    val isDownloadingUpdate: Boolean = false,
+    val updateDownloadProgress: Float = 0f,
+    val downloadedApkFile: File? = null
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val historyDao = (application as PureTubeApplication).database.watchHistoryDao()
+    private val app = application as PureTubeApplication
+    private val historyDao = app.database.watchHistoryDao()
+    private val preferences = app.preferences
 
-    private val _uiState = MutableStateFlow(MainUiState())
+    val appSettings: StateFlow<AppSettings> = preferences.settings
+
+    private val _uiState = MutableStateFlow(
+        MainUiState(
+            playbackSpeed = preferences.settings.value.defaultPlaybackSpeed,
+            backgroundPlayEnabled = preferences.settings.value.backgroundPlayEnabled
+        )
+    )
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
     val watchHistory: StateFlow<List<WatchHistoryEntity>> = historyDao
         .observeAllHistory()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    init {
+        if (preferences.settings.value.autoCheckUpdates) {
+            checkForAppUpdates(manual = false)
+        }
+    }
 
     fun onUrlChanged(newUrl: String) {
         _uiState.update { it.copy(inputUrl = newUrl, errorMessage = null) }
@@ -70,37 +98,42 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val result = YoutubeStreamExtractor.extractStream(target)
             result.fold(
                 onSuccess = { extracted ->
-                    // Pick optimal hardware-accelerated 1080p stream by default if available
-                    val defaultQuality = YoutubeStreamExtractor.selectDefaultStartupQuality(extracted.qualities)
+                    val currentSettings = preferences.settings.value
+
+                    // Pick optimal hardware-accelerated stream matching user's preferred resolution
+                    val defaultQuality = YoutubeStreamExtractor.selectDefaultStartupQuality(
+                        qualities = extracted.qualities,
+                        preferredHeight = currentSettings.defaultQualityHeight
+                    )
 
                     // Always default to Original audio track first
                     val defaultAudioTrack = extracted.audioTracks.firstOrNull {
                         it.isOriginal
                     } ?: extracted.audioTracks.firstOrNull()
 
-                    // Save to Watch History immediately
                     val existing = historyDao.getByVideoId(extracted.videoId)
                     val startPosition = if (resumePositionMs > 0L) {
                         resumePositionMs
                     } else {
                         existing?.lastPositionMs?.takeIf {
-                            // Resume if previous position wasn't at the very end (< 95% duration)
                             extracted.durationSeconds > 0 && it < (extracted.durationSeconds * 950L)
                         } ?: 0L
                     }
 
-                    historyDao.upsert(
-                        WatchHistoryEntity(
-                            videoId = extracted.videoId,
-                            url = extracted.originalUrl,
-                            title = extracted.title,
-                            uploaderName = extracted.uploaderName,
-                            thumbnailUrl = extracted.thumbnailUrl,
-                            durationSeconds = extracted.durationSeconds,
-                            lastPositionMs = startPosition,
-                            watchedAtTimestamp = System.currentTimeMillis()
+                    if (currentSettings.saveWatchHistory) {
+                        historyDao.upsert(
+                            WatchHistoryEntity(
+                                videoId = extracted.videoId,
+                                url = extracted.originalUrl,
+                                title = extracted.title,
+                                uploaderName = extracted.uploaderName,
+                                thumbnailUrl = extracted.thumbnailUrl,
+                                durationSeconds = extracted.durationSeconds,
+                                lastPositionMs = startPosition,
+                                watchedAtTimestamp = System.currentTimeMillis()
+                            )
                         )
-                    )
+                    }
 
                     _uiState.update {
                         it.copy(
@@ -109,7 +142,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                             selectedQuality = defaultQuality,
                             selectedAudioTrack = defaultAudioTrack,
                             selectedCaption = null,
-                            playbackSpeed = 1.0f,
+                            playbackSpeed = currentSettings.defaultPlaybackSpeed,
+                            backgroundPlayEnabled = currentSettings.backgroundPlayEnabled,
                             initialSeekPositionMs = startPosition
                         )
                     }
@@ -170,10 +204,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setBackgroundPlayEnabled(enabled: Boolean) {
+        preferences.setBackgroundPlayEnabled(enabled)
         _uiState.update { it.copy(backgroundPlayEnabled = enabled) }
     }
 
     fun savePlaybackProgress(videoId: String, positionMs: Long) {
+        if (!preferences.settings.value.saveWatchHistory) return
         viewModelScope.launch {
             historyDao.updateProgress(videoId, positionMs)
         }
@@ -204,6 +240,147 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun clearAllHistory() {
         viewModelScope.launch {
             historyDao.clearAll()
+        }
+    }
+
+    // =========================================================================
+    // APP SETTINGS ACTIONS
+    // =========================================================================
+
+    fun updateThemeMode(mode: AppThemeMode) = preferences.setThemeMode(mode)
+    fun updateDynamicColor(enabled: Boolean) = preferences.setDynamicColorEnabled(enabled)
+    fun updateDefaultQualityHeight(height: Int) = preferences.setDefaultQualityHeight(height)
+    fun updateDefaultPlaybackSpeed(speed: Float) {
+        preferences.setDefaultPlaybackSpeed(speed)
+        _uiState.update { it.copy(playbackSpeed = speed) }
+    }
+    fun updateAutoPipOnHome(enabled: Boolean) = preferences.setAutoPipOnHome(enabled)
+    fun updateAutoStartKidsLocked(enabled: Boolean) = preferences.setAutoStartKidsLocked(enabled)
+    fun updateAutoFullscreenOnPlay(enabled: Boolean) = preferences.setAutoFullscreenOnPlay(enabled)
+    fun updateHideVideoDescription(enabled: Boolean) = preferences.setHideVideoDescription(enabled)
+    fun updateSaveWatchHistory(enabled: Boolean) = preferences.setSaveWatchHistory(enabled)
+    fun updateAutoCheckUpdates(enabled: Boolean) = preferences.setAutoCheckUpdates(enabled)
+
+    // =========================================================================
+    // IN-APP UPDATE CHECKER & DOWNLOADER
+    // =========================================================================
+
+    fun checkForAppUpdates(manual: Boolean = true) {
+        if (_uiState.value.isCheckingForUpdate) return
+
+        _uiState.update {
+            it.copy(
+                isCheckingForUpdate = true,
+                updateStatusMessage = if (manual) "Checking GitHub Releases..." else null
+            )
+        }
+
+        viewModelScope.launch {
+            val result = AppUpdateManager.checkForUpdate(app)
+            result.fold(
+                onSuccess = { updateInfo ->
+                    if (updateInfo != null) {
+                        val skipped = preferences.settings.value.skippedUpdateVersion
+                        val shouldShowDialog = manual || updateInfo.versionName != skipped
+                        _uiState.update {
+                            it.copy(
+                                isCheckingForUpdate = false,
+                                availableUpdate = updateInfo,
+                                showUpdateDialog = shouldShowDialog,
+                                updateStatusMessage = "New update available: v${updateInfo.versionName}"
+                            )
+                        }
+                    } else {
+                        _uiState.update {
+                            it.copy(
+                                isCheckingForUpdate = false,
+                                availableUpdate = null,
+                                updateStatusMessage = if (manual) {
+                                    "You're on the latest version (v${AppUpdateManager.getCurrentVersionName(app)})"
+                                } else null
+                            )
+                        }
+                    }
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            isCheckingForUpdate = false,
+                            updateStatusMessage = if (manual) {
+                                "Update check failed: ${err.localizedMessage ?: "Network error"}"
+                            } else null
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    fun openUpdateDialog() {
+        if (_uiState.value.availableUpdate != null) {
+            _uiState.update { it.copy(showUpdateDialog = true) }
+        }
+    }
+
+    fun dismissUpdateDialog(skipThisVersion: Boolean = false) {
+        val ver = _uiState.value.availableUpdate?.versionName
+        if (skipThisVersion && !ver.isNullOrEmpty()) {
+            preferences.setSkippedUpdateVersion(ver)
+        }
+        _uiState.update { it.copy(showUpdateDialog = false) }
+    }
+
+    fun downloadAndInstallUpdate() {
+        val updateInfo = _uiState.value.availableUpdate ?: return
+        if (_uiState.value.isDownloadingUpdate) return
+
+        // If already downloaded for this version, install immediately
+        val existingFile = _uiState.value.downloadedApkFile
+        if (existingFile != null && existingFile.exists() && existingFile.name == updateInfo.apkFileName) {
+            AppUpdateManager.installApk(app, existingFile)
+            return
+        }
+
+        _uiState.update {
+            it.copy(
+                isDownloadingUpdate = true,
+                updateDownloadProgress = 0f,
+                updateStatusMessage = "Downloading ${updateInfo.apkFileName}..."
+            )
+        }
+
+        viewModelScope.launch {
+            val result = AppUpdateManager.downloadUpdateApk(
+                context = app,
+                updateInfo = updateInfo,
+                onProgress = { fraction ->
+                    _uiState.update { state ->
+                        state.copy(updateDownloadProgress = fraction)
+                    }
+                }
+            )
+
+            result.fold(
+                onSuccess = { apkFile ->
+                    _uiState.update {
+                        it.copy(
+                            isDownloadingUpdate = false,
+                            updateDownloadProgress = 1f,
+                            downloadedApkFile = apkFile,
+                            updateStatusMessage = "Ready to install v${updateInfo.versionName}"
+                        )
+                    }
+                    AppUpdateManager.installApk(app, apkFile)
+                },
+                onFailure = { err ->
+                    _uiState.update {
+                        it.copy(
+                            isDownloadingUpdate = false,
+                            updateStatusMessage = "Download failed: ${err.localizedMessage ?: "Unknown error"}"
+                        )
+                    }
+                }
+            )
         }
     }
 }

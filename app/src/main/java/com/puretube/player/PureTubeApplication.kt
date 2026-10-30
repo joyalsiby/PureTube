@@ -2,6 +2,7 @@ package com.puretube.player
 
 import android.app.Application
 import com.puretube.player.data.AppDatabase
+import com.puretube.player.data.AppPreferences
 import com.puretube.player.extractor.OkHttpDownloader
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.localization.ContentCountry
@@ -11,6 +12,7 @@ import java.util.Locale
 class PureTubeApplication : Application() {
 
     val database: AppDatabase by lazy { AppDatabase.getInstance(this) }
+    val preferences: AppPreferences by lazy { AppPreferences(this) }
 
     override fun onCreate() {
         super.onCreate()

@@ -243,25 +243,34 @@ object YoutubeStreamExtractor {
         }
     }
 
-    fun selectDefaultStartupQuality(qualities: List<VideoQualityOption>): VideoQualityOption? {
+    fun selectDefaultStartupQuality(
+        qualities: List<VideoQualityOption>,
+        preferredHeight: Int = 1080
+    ): VideoQualityOption? {
         if (qualities.isEmpty()) return null
-        // Prefer 30fps hardware-decoded AVC1 (H.264) at 1080p or 720p first for cool, battery-friendly playback,
-        // avoiding 60fps or AV1 software-decoded streams unless explicitly chosen by the user.
-        return qualities.firstOrNull {
-            it.resolutionHeight == 1080 && it.fps <= 30 && it.codec?.startsWith("avc", ignoreCase = true) == true
-        } ?: qualities.firstOrNull {
-            it.resolutionHeight == 720 && it.fps <= 30 && it.codec?.startsWith("avc", ignoreCase = true) == true
-        } ?: qualities.firstOrNull {
-            it.resolutionHeight == 1080 && it.fps <= 30 && !it.codec.orEmpty().startsWith("av01", ignoreCase = true)
-        } ?: qualities.firstOrNull {
-            it.resolutionHeight == 720 && it.fps <= 30 && !it.codec.orEmpty().startsWith("av01", ignoreCase = true)
-        } ?: qualities.firstOrNull {
-            it.resolutionHeight == 1080 && it.codec?.startsWith("avc", ignoreCase = true) == true
-        } ?: qualities.firstOrNull {
-            it.resolutionHeight == 720
-        } ?: qualities.firstOrNull {
-            it.resolutionHeight <= 1080
-        } ?: qualities.firstOrNull()
+        // 1. Try matching user's preferred resolution height with hardware-decoded AVC1 30fps first
+        qualities.firstOrNull {
+            it.resolutionHeight == preferredHeight && it.fps <= 30 && it.codec?.startsWith("avc", ignoreCase = true) == true
+        }?.let { return it }
+
+        qualities.firstOrNull {
+            it.resolutionHeight == preferredHeight && it.fps <= 30 && !it.codec.orEmpty().startsWith("av01", ignoreCase = true)
+        }?.let { return it }
+
+        qualities.firstOrNull {
+            it.resolutionHeight == preferredHeight
+        }?.let { return it }
+
+        // 2. Fallback to nearest resolution at or below preferredHeight
+        qualities.firstOrNull {
+            it.resolutionHeight <= preferredHeight && it.fps <= 30 && it.codec?.startsWith("avc", ignoreCase = true) == true
+        }?.let { return it }
+
+        qualities.firstOrNull {
+            it.resolutionHeight <= preferredHeight
+        }?.let { return it }
+
+        return qualities.firstOrNull()
     }
 
     private fun videoCodecRank(codec: String?): Int {

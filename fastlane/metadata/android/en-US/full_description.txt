@@ -1,0 +1,8 @@
+PureTube is a 100% ad-free, distraction-free Material 3 YouTube video player built for parents, kids, and mindful focus.
+
+Keep the official YouTube app locked on your phone and share or paste only the exact video link you want your child (or yourself) to watch:
+• Zero Ads & Zero Tracking: Powered locally by NewPipeExtractor and AndroidX Media3 (ExoPlayer).
+• No Search Bar, No Recommendations, No Shorts Feed: Prevents kids and students from falling into algorithmic rabbit holes.
+• Kids & Focus Parental Controls: Start videos automatically with Screen Lock enabled so toddlers cannot accidentally tap out, auto-enter Fullscreen, or hide descriptions.
+• Full YouTube Player Features: Up to 4K HDR/60fps quality, Multi-Audio Track switcher (defaults to Original audio), Closed Captions (CC), Video Chapters, Clickable Timestamps, Pinch-to-Zoom, Fullscreen Brightness/Volume swipe gestures, Background Audio Play, and Picture-in-Picture (PiP).
+• Built-In App Updater: Automatically checks GitHub Releases and updates in-app with one tap.
