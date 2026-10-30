@@ -57,9 +57,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.puretube.player.ui.screens.PureTubeShieldLogo
@@ -387,12 +397,8 @@ fun WhatsNewReleaseNotesDialog(
                                     ),
                                     color = MaterialTheme.colorScheme.primary
                                 )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = cachedRemoteNotes,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                MarkdownReleaseNotesView(markdown = cachedRemoteNotes)
                             }
                         }
                     }
@@ -499,6 +505,319 @@ fun WhatsNewReleaseNotesDialog(
                         )
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Renders GitHub Release Notes Markdown & HTML into structured Material 3 Compose UI
+ * (Headings, Dividers, Numbered/Bulleted Lists, Bold spans, Monospace inline code, and Clickable Links).
+ */
+@Composable
+fun MarkdownReleaseNotesView(
+    markdown: String,
+    modifier: Modifier = Modifier
+) {
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariantColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val codeBgColor = MaterialTheme.colorScheme.surfaceContainerHighest
+
+    val cleanedLines = remember(markdown) {
+        normalizeReleaseMarkdownLines(markdown)
+    }
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        cleanedLines.forEach { rawLine ->
+            val trimmed = rawLine.trim()
+            val leadingSpaces = rawLine.indexOfFirst { !it.isWhitespace() }.coerceAtLeast(0)
+            val isIndentedSubItem = leadingSpaces >= 2
+
+            when {
+                trimmed.isEmpty() -> {
+                    Spacer(modifier = Modifier.height(2.dp))
+                }
+
+                trimmed == "---" || trimmed == "***" || trimmed == "___" -> {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 6.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+                    )
+                }
+
+                trimmed.startsWith("### ") || trimmed.startsWith("## ") || trimmed.startsWith("# ") -> {
+                    val headingText = trimmed.replace(Regex("""^#{1,4}\s*"""), "").trim()
+                    val annotatedHeading = remember(headingText, onSurfaceColor, primaryColor, codeBgColor) {
+                        buildMarkdownAnnotatedString(
+                            text = headingText,
+                            baseColor = primaryColor,
+                            boldColor = primaryColor,
+                            linkColor = primaryColor,
+                            codeColor = primaryColor,
+                            codeBackground = codeBgColor
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = annotatedHeading,
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            lineHeight = 20.sp
+                        ),
+                        color = primaryColor
+                    )
+                }
+
+                Regex("""^\d+\.\s+.*""").matches(trimmed) -> {
+                    val numberPrefix = trimmed.substringBefore(".").trim() + "."
+                    val itemContent = trimmed.substringAfter(".").trim()
+                    val annotatedItem = remember(itemContent, onSurfaceColor, onSurfaceVariantColor, primaryColor, codeBgColor) {
+                        buildMarkdownAnnotatedString(
+                            text = itemContent,
+                            baseColor = onSurfaceVariantColor,
+                            boldColor = onSurfaceColor,
+                            linkColor = primaryColor,
+                            codeColor = onSurfaceColor,
+                            codeBackground = codeBgColor
+                        )
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = if (isIndentedSubItem) 12.dp else 0.dp, top = 2.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text(
+                            text = numberPrefix,
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                lineHeight = 19.sp
+                            ),
+                            color = primaryColor,
+                            modifier = Modifier.width(22.dp)
+                        )
+                        Text(
+                            text = annotatedItem,
+                            style = MaterialTheme.typography.bodySmall.copy(lineHeight = 19.sp),
+                            color = onSurfaceVariantColor,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                trimmed.startsWith("- ") || trimmed.startsWith("* ") || trimmed.startsWith("• ") -> {
+                    val bulletContent = trimmed.drop(2).trim()
+                    val annotatedBullet = remember(bulletContent, onSurfaceColor, onSurfaceVariantColor, primaryColor, codeBgColor) {
+                        buildMarkdownAnnotatedString(
+                            text = bulletContent,
+                            baseColor = onSurfaceVariantColor,
+                            boldColor = onSurfaceColor,
+                            linkColor = primaryColor,
+                            codeColor = onSurfaceColor,
+                            codeBackground = codeBgColor
+                        )
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = if (isIndentedSubItem) 14.dp else 2.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text(
+                            text = "•",
+                            style = MaterialTheme.typography.bodySmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                lineHeight = 19.sp
+                            ),
+                            color = if (isIndentedSubItem) onSurfaceVariantColor else primaryColor,
+                            modifier = Modifier.width(14.dp)
+                        )
+                        Text(
+                            text = annotatedBullet,
+                            style = MaterialTheme.typography.bodySmall.copy(lineHeight = 19.sp),
+                            color = onSurfaceVariantColor,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                else -> {
+                    val annotatedParagraph = remember(trimmed, onSurfaceColor, onSurfaceVariantColor, primaryColor, codeBgColor) {
+                        buildMarkdownAnnotatedString(
+                            text = trimmed,
+                            baseColor = onSurfaceVariantColor,
+                            boldColor = onSurfaceColor,
+                            linkColor = primaryColor,
+                            codeColor = onSurfaceColor,
+                            codeBackground = codeBgColor
+                        )
+                    }
+                    Text(
+                        text = annotatedParagraph,
+                        style = MaterialTheme.typography.bodySmall.copy(lineHeight = 19.sp),
+                        color = onSurfaceVariantColor
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun normalizeReleaseMarkdownLines(raw: String): List<String> {
+    // 1. Strip HTML <div...>...</div> header banner blocks or convert inner tags cleanly
+    val withoutHtmlBanner = raw
+        .replace("\r\n", "\n")
+        .replace(Regex("""<div[^>]*>[\s\S]*?</div>""", RegexOption.IGNORE_CASE), "")
+        .replace(Regex("""<img[^>]*>""", RegexOption.IGNORE_CASE), "")
+        .replace(Regex("""<h[1-4][^>]*>(.*?)</h[1-4]>""", RegexOption.IGNORE_CASE), "### $1")
+        .replace(Regex("""<b>(.*?)</b>""", RegexOption.IGNORE_CASE), "**$1**")
+        .replace(Regex("""<strong>(.*?)</strong>""", RegexOption.IGNORE_CASE), "**$1**")
+        .replace(Regex("""<code>(.*?)</code>""", RegexOption.IGNORE_CASE), "`$1`")
+        .replace(Regex("""</?p[^>]*>""", RegexOption.IGNORE_CASE), "")
+        .replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+
+    val result = mutableListOf<String>()
+    var previousBlank = true
+    var previousDivider = false
+
+    for (line in withoutHtmlBanner.lines()) {
+        val trimmed = line.trim()
+        if (trimmed.isEmpty()) {
+            if (!previousBlank) {
+                result.add("")
+                previousBlank = true
+            }
+            continue
+        }
+        if (trimmed == "---" || trimmed == "***" || trimmed == "___") {
+            if (result.isEmpty() || previousDivider) continue
+            result.add("---")
+            previousDivider = true
+            previousBlank = false
+            continue
+        }
+        previousBlank = false
+        previousDivider = false
+        result.add(line)
+    }
+
+    while (result.lastOrNull()?.let { it.isBlank() || it == "---" } == true) {
+        result.removeAt(result.lastIndex)
+    }
+    return result
+}
+
+private val InlineMarkdownTokenRegex = Regex(
+    """(\[`[^`\]]+`\]\([^)]+\)|\[[^\]]+\]\([^)]+\)|\*\*[^*]+\*\*|`[^`]+`)"""
+)
+
+private fun buildMarkdownAnnotatedString(
+    text: String,
+    baseColor: Color,
+    boldColor: Color,
+    linkColor: Color,
+    codeColor: Color,
+    codeBackground: Color
+): AnnotatedString {
+    return buildAnnotatedString {
+        var lastIndex = 0
+        for (match in InlineMarkdownTokenRegex.findAll(text)) {
+            val start = match.range.first
+            val endExclusive = match.range.last + 1
+            if (start > lastIndex) {
+                withStyle(SpanStyle(color = baseColor)) {
+                    append(text.substring(lastIndex, start))
+                }
+            }
+
+            val token = match.value
+            when {
+                // Markdown link: [label](url) or [`codeLabel`](url)
+                token.startsWith("[") && token.contains("](") && token.endsWith(")") -> {
+                    val rawLabel = token.substringAfter("[").substringBefore("](")
+                    val cleanLabel = rawLabel.removeSurrounding("`")
+                    val isCodeLabel = rawLabel.startsWith("`") && rawLabel.endsWith("`")
+                    val url = token.substringAfter("](").removeSuffix(")").trim()
+
+                    if (url.startsWith("http://") || url.startsWith("https://")) {
+                        val link = LinkAnnotation.Url(
+                            url = url,
+                            styles = TextLinkStyles(
+                                style = SpanStyle(
+                                    color = linkColor,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontFamily = if (isCodeLabel) FontFamily.Monospace else null
+                                )
+                            )
+                        )
+                        withLink(link) {
+                            append(cleanLabel)
+                        }
+                    } else {
+                        // Local file:/// reference from PROJECT_LOG.md -> render clean filename pill without URL
+                        withStyle(
+                            SpanStyle(
+                                color = codeColor,
+                                fontWeight = FontWeight.SemiBold,
+                                fontFamily = if (isCodeLabel) FontFamily.Monospace else null,
+                                background = if (isCodeLabel) codeBackground else Color.Unspecified
+                            )
+                        ) {
+                            append(cleanLabel)
+                        }
+                    }
+                }
+
+                // Bold: **text**
+                token.startsWith("**") && token.endsWith("**") && token.length > 4 -> {
+                    val inner = token.removeSurrounding("**")
+                    // Support nested `code` or [link](url) inside **bold**
+                    val innerAnnotated = buildMarkdownAnnotatedString(
+                        text = inner,
+                        baseColor = boldColor,
+                        boldColor = boldColor,
+                        linkColor = linkColor,
+                        codeColor = codeColor,
+                        codeBackground = codeBackground
+                    )
+                    withStyle(SpanStyle(color = boldColor, fontWeight = FontWeight.Bold)) {
+                        append(innerAnnotated)
+                    }
+                }
+
+                // Inline code: `code`
+                token.startsWith("`") && token.endsWith("`") && token.length > 2 -> {
+                    val codeText = token.removeSurrounding("`")
+                    withStyle(
+                        SpanStyle(
+                            color = codeColor,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.SemiBold,
+                            background = codeBackground
+                        )
+                    ) {
+                        append(" $codeText ")
+                    }
+                }
+
+                else -> {
+                    withStyle(SpanStyle(color = baseColor)) {
+                        append(token)
+                    }
+                }
+            }
+            lastIndex = endExclusive
+        }
+
+        if (lastIndex < text.length) {
+            withStyle(SpanStyle(color = baseColor)) {
+                append(text.substring(lastIndex))
             }
         }
     }

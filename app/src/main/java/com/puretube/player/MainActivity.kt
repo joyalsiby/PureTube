@@ -67,6 +67,7 @@ import com.puretube.player.ui.screens.OnboardingScreen
 import com.puretube.player.ui.screens.SettingsScreen
 import com.puretube.player.ui.screens.WatchHomeScreen
 import com.puretube.player.ui.theme.PureTubeTheme
+import com.puretube.player.updater.MarkdownReleaseNotesView
 import com.puretube.player.updater.WhatsNewReleaseNotesDialog
 import kotlin.math.roundToInt
 
@@ -339,10 +340,8 @@ fun PureTubeApp(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     if (availableUpdate.releaseNotes.isNotBlank()) {
-                        Text(
-                            text = availableUpdate.releaseNotes,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        MarkdownReleaseNotesView(
+                            markdown = availableUpdate.releaseNotes
                         )
                     } else {
                         Text(

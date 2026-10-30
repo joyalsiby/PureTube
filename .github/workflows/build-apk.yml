@@ -33,40 +33,30 @@ jobs:
           echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
           echo "apk_name=$APK_NAME" >> $GITHUB_OUTPUT
 
-          # Extract section for current version from PROJECT_LOG.md
-          VERSION_LOG=$(awk "/^## .*v${VERSION_NAME}/{flag=1; next} /^## /{flag=0} /^---/{flag=0} flag" PROJECT_LOG.md)
+          # Extract section for current version from PROJECT_LOG.md and strip local file:/// links
+          VERSION_LOG=$(awk "/^## .*v${VERSION_NAME}/{flag=1; next} /^## /{flag=0} /^---/{flag=0} flag" PROJECT_LOG.md | sed -E 's/\[`([^`]+)`\]\(file:\/\/[^)]+\)/`\1`/g; s/\[([^]]+)\]\(file:\/\/[^)]+\)/\1/g; s/ \([^)]*\.kt[^)]*\)//g')
 
-          cat << 'EOF' > release_notes.md
-          <div align="center">
-            <img src="https://raw.githubusercontent.com/${{ github.repository }}/main/assets/logo.svg" width="76" height="76" alt="PureTube Logo" />
-            <h2>PureTube <code>v${VERSION_NAME}</code></h2>
-            <p><b>Distraction-Free, 100% Ad-Free Material 3 YouTube Player for Kids, Parents & Focus</b></p>
-          </div>
-
-          ---
-          EOF
-
-          sed -i "s/\${VERSION_NAME}/${VERSION_NAME}/g" release_notes.md
-
-          echo "### 📦 Direct APK Download" >> release_notes.md
-          echo "- ⬇️ **[Download \`${APK_NAME}\`](https://github.com/${{ github.repository }}/releases/download/v${VERSION_NAME}/${APK_NAME})** (\`versionCode = ${VERSION_CODE}\`)" >> release_notes.md
-          echo "- 🔄 **In-Place Upgrade Ready:** Signed with PureTube's persistent release keystore—install directly over your current app (or use **Settings → Check for Updates** inside the app) without losing watch history or settings." >> release_notes.md
-          echo "" >> release_notes.md
+          : > release_notes.md
 
           if [ -n "$VERSION_LOG" ]; then
-            echo "### ✨ What's New in \`v${VERSION_NAME}\`" >> release_notes.md
+            echo "### ✨ What's New in v${VERSION_NAME}" >> release_notes.md
             echo "$VERSION_LOG" >> release_notes.md
             echo "" >> release_notes.md
           fi
+
+          echo "### 📦 Direct APK Download" >> release_notes.md
+          echo "- ⬇️ **[Download ${APK_NAME}](https://github.com/${{ github.repository }}/releases/download/v${VERSION_NAME}/${APK_NAME})** (\`versionCode = ${VERSION_CODE}\`)" >> release_notes.md
+          echo "- 🔄 **In-Place Upgrade Ready:** Signed with PureTube's persistent release keystore—install directly over your current app (or use **Settings → Check for Updates** inside the app) without losing watch history or settings." >> release_notes.md
+          echo "" >> release_notes.md
 
           cat << 'EOF' >> release_notes.md
           ---
 
           ### 🌟 Complete PureTube Feature Highlights
-          - 🧒 **Kids & Focus Mode (Parental Controls):** Keep the official YouTube app locked and share/paste only the video link you want your kids to watch—with **Zero Ads**, **No Search Bar**, **No Shorts Feed**, and **No Algorithmic Recommendations**. Includes **Auto Kids Screen Lock** on startup, **Auto-Fullscreen**, and **Hide Description/Stats** toggles.
-          - 🎬 **Authentic Material 3 YouTube Player UI:** Up to **4K / 1080p60** adaptive DASH playback, **Multi-Audio Track Switcher** (defaults to `Original` audio), **Closed Captions (`CC`)**, **Video Chapters** on the red seekbar, and **Clickable Timestamps** in the description.
-          - 👆 **Fullscreen Touch Gestures:** Left vertical swipe for **Brightness (`0%–100%`)**, right vertical swipe for **Volume (`0%–100%`)**, two-finger **Pinch-to-Zoom (`Zoomed to fill` / `Original`)**, and double-tap `±10s` seek.
-          - 🎧 **Background Play & Picture-in-Picture (PiP):** Keep audio playing with the screen off or float the video in a 16:9 PiP window when pressing Home.
+          - 🧒 **Kids & Focus Mode (Parental Controls):** Keep the official YouTube app locked and share/paste only the video link you want your kids to watch—with **Zero Ads**, **No Search Bar**, **No Shorts Feed**, and **No Algorithmic Recommendations**. Includes **Toddler-Proof Kids Screen Lock** (`Hold 2s` or `Parent Math Challenge`), **Auto-Fullscreen**, and **Hide Description/Stats** toggles.
+          - 🎬 **Authentic Material 3 YouTube Player UI:** Up to **4K / 1080p60** adaptive DASH playback, **Multi-Audio Track Switcher** (defaults to `Original` audio), **Closed Captions (`CC`)**, **Single-Video Loop**, **YouTube Playlists**, **Video Chapters** on the red seekbar, and **Clickable Timestamps** in the description.
+          - 👆 **Fullscreen Touch Gestures:** **Long-press for `2x` Speed**, left vertical swipe for **Brightness (`0%–100%`)**, right vertical swipe for **Volume (`0%–100%`)**, two-finger **Pinch-to-Zoom (`Zoomed to fill` / `Original`)**, and double-tap `±10s` seek.
+          - 🔔 **Media Notification Banner & Closeable PiP:** Android Quick Settings Media Control Panel & Notification Banner (`Play/Pause`, `-10s`, `+10s`, seekbar, `Close`), **Background Play OFF by default**, and automatic **Closeable Picture-in-Picture (PiP)** when leaving the app.
           - ⚡ **Zero-Stall Startup & Cool Battery Performance:** Parallel RAM stream preloader (`640 KB` video + `192 KB` audio), anti-throttling HTTP/2 range client, hardware `AVC1 (H.264)` priority, and zero Compose recompositions when controls are hidden.
           - 🔄 **Built-In In-App Updater:** Automatically notifies when a new version is released on GitHub and downloads + installs the update in 1 tap.
 
