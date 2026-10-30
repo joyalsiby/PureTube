@@ -244,7 +244,7 @@ fun WatchHomeScreen(
         // Subtle version indicator at the bottom of the screen (vX.X.XXX format)
         val versionName = runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        }.getOrNull() ?: "0.3.005"
+        }.getOrNull() ?: "0.3.006"
 
         Text(
             text = "v$versionName",

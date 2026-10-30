@@ -1,6 +1,6 @@
 # PureTube — Minimal Material 3 Ad-Free YouTube Player
 
-**PureTube** (`v0.3.005`) is a lightweight, 100% ad-free native Android video player for YouTube links. Built with **Kotlin**, **Jetpack Compose (Material 3 / Dynamic Color)**, **NewPipeExtractor**, **AndroidX Media3 (ExoPlayer)**, and **Room SQLite**.
+**PureTube** (`v0.3.006`) is a lightweight, 100% ad-free native Android video player for YouTube links. Built with **Kotlin**, **Jetpack Compose (Material 3 / Dynamic Color)**, **NewPipeExtractor**, **AndroidX Media3 (ExoPlayer)**, and **Room SQLite**.
 
 ---
 
@@ -25,15 +25,18 @@
 - **Portrait Watch Page Layout:**
   - **16:9 Top Video Player Frame** positioned cleanly below the Android status bar inset.
   - **Watch Details Panel (`#0F0F0F`):** Displays the video title, active stream summary (`1080p · Audio: Original · CC · Ad-Free Stream`), channel row with avatar and **`Options`** button, and horizontally scrollable **YouTube Action Chips** (`Quality`, `Audio`, `Captions`, `Speed`, `Fullscreen`, `Share`, `Copy link`).
-  - **Expandable Video Description Card (`#1A1A1A`):** Displays view count, upload date, and like count at the top of the card with a 3-line description preview (`More` / `Show less`) that expands smoothly to show the full selectable video description.
+  - **Expandable Video Description Card (`#1A1A1A`) with Clickable Timestamps:** Displays view count, upload date, and like count at the top of the card with a 3-line description preview (`More` / `Show less`) that expands smoothly to show the full selectable video description. Any `0:00` / `01:23` timestamps in the description are rendered as clickable YouTube Blue links that jump directly to that point in the video.
+  - **Video Chapters & Seekbar Tick Markers:** Automatically extracts official YouTube chapters (`streamSegments`) or parses chapter lists from the video description, rendering dark chapter boundary ticks along the red seekbar, showing the current chapter name next to the timestamp & scrubbing preview bubble, and providing a **Video Chapters** bottom sheet.
 - **Authentic YouTube Overlay Controls:**
-  - **Top Bar:** Collapse chevron (`KeyboardArrowDown`) on the left (plus video title & channel name in fullscreen), and top-right quick icons for **Audio Track**, **Closed Captions (`CC`)**, **Fit/Fill toggle** (in fullscreen), and the **Settings Gear (`⚙️`)**.
+  - **Top Bar:** Collapse chevron (`KeyboardArrowDown`) on the left (plus video title & channel name in fullscreen), and top-right quick icons for **Audio Track**, **Closed Captions (`CC`)**, **Fit/Fill toggle** (in fullscreen), **Picture-in-Picture (`PiP`)**, and the **Settings Gear (`⚙️`)**.
   - **Center Controls:** Translucent dark circular buttons (`-10s`, `Play / Pause / Replay`, `+10s`) with crisp white icons.
-  - **Bottom Bar & YouTube Red (`#FF0000`) Seekbar:** Timestamp (`0:12 / 4:20`) on the left and `Fullscreen` toggle on the right, placed above a custom **YouTube Red Seekbar** showing unplayed, white buffered progress, and active red progress tracks with a scrubbing preview bubble.
-  - **Unified YouTube Settings (`⚙️`) Bottom Sheet:** Access **Quality**, **Playback speed** (`0.25x`–`2.0x`), **Captions**, **Audio track**, **Zoom to fill screen**, and **Lock screen** from one menu.
+  - **Bottom Bar & YouTube Red (`#FF0000`) Seekbar:** Timestamp (`0:12 / 4:20 • Chapter >`) on the left and `Fullscreen` toggle on the right, placed above a custom **YouTube Red Seekbar** showing unplayed, white buffered progress, active red progress, and chapter tick marks with a scrubbing preview bubble.
+  - **Unified YouTube Settings (`⚙️`) Bottom Sheet:** Access **Quality**, **Playback speed** (`0.25x`–`2.0x`), **Captions**, **Audio track**, **Chapters**, **Background play**, **Picture-in-Picture (PiP)**, **Zoom to fill screen**, and **Lock screen** from one menu.
 
-### 5. Fullscreen Pinch-to-Zoom (Fit & Fill), Multi-Audio, Captions (`CC`), & Watch History
+### 5. Fullscreen Gestures (Pinch-to-Zoom, Brightness & Volume), Background Play, PiP, & Watch History
+- **Fullscreen Vertical Swipe Brightness & Volume Gestures:** Swipe up/down on the **left half** of the fullscreen player to adjust screen brightness (`0%–100%`) or on the **right half** to adjust media volume (`0%–100%`) with a top-center HUD indicator.
 - **Two-Finger Pinch in Fullscreen:** Pinch out for `Zoomed to fill` (`RESIZE_MODE_ZOOM`) or pinch in for `Original` (`RESIZE_MODE_FIT`). Pinching out in portrait smoothly enters fullscreen.
+- **Background Audio Playback & Picture-in-Picture (PiP):** Keep audio playing with the screen off (`Background play: On` by default with `WAKE_MODE_NETWORK` & audio focus handling), or press Home / tap `PiP` to watch in a floating 16:9 Picture-in-Picture window.
 - **Multi-Audio Track Switcher:** Automatically defaults to the **`Original`** audio track and supports switching to dubbed or descriptive tracks at any resolution.
 - **Closed Captions (`CC`):** Extracts manual and auto-generated YouTube subtitle tracks (`WebVTT` / `TTML`).
 - **Local Watch History ([`WatchHistoryDatabase.kt`](app/src/main/java/com/puretube/player/data/WatchHistoryDatabase.kt) & [`HistoryScreen.kt`](app/src/main/java/com/puretube/player/ui/screens/HistoryScreen.kt)):** Saves watched videos and last playback positions locally in Room SQLite.
@@ -64,8 +67,8 @@ All dependencies and versions are managed centrally in [`gradle/libs.versions.to
 
 ### Pre-Built APK Files
 Ready-to-install APKs in the project root:
-- [`PureTube-v0.3.005-debug.apk`](PureTube-v0.3.005-debug.apk) (`v0.3.005`, `versionCode = 8`)
-- [`PureTube-debug.apk`](PureTube-debug.apk) (latest build — `v0.3.005`, `versionCode = 8`)
+- [`PureTube-v0.3.006-debug.apk`](PureTube-v0.3.006-debug.apk) (`v0.3.006`, `versionCode = 9`)
+- [`PureTube-debug.apk`](PureTube-debug.apk) (latest build — `v0.3.006`, `versionCode = 9`)
 
 > **In-Place Upgrades:** All builds are signed with [`app/keystore/puretube.keystore`](app/keystore/puretube.keystore), ensuring future builds update directly over the installed app without uninstalling.
 

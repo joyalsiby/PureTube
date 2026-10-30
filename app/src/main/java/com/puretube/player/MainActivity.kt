@@ -1,7 +1,12 @@
 package com.puretube.player
 
+import android.app.PictureInPictureParams
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.res.Configuration
+import android.os.Build
 import android.os.Bundle
+import android.util.Rational
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -22,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -35,6 +41,7 @@ import com.puretube.player.ui.theme.PureTubeTheme
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
+    private var isInPipModeState by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,7 +53,11 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             PureTubeTheme {
-                PureTubeApp(viewModel = viewModel)
+                PureTubeApp(
+                    viewModel = viewModel,
+                    isInPipMode = isInPipModeState,
+                    onRequestPipMode = ::enterPipIfSupported
+                )
             }
         }
     }
@@ -55,6 +66,37 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleIncomingIntent(intent)
+    }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        // Automatically enter Picture-in-Picture (PiP) mode when pressing Home while watching a video
+        if (viewModel.uiState.value.activeVideo != null) {
+            enterPipIfSupported()
+        }
+    }
+
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: Configuration
+    ) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        isInPipModeState = isInPictureInPictureMode
+    }
+
+    fun enterPipIfSupported(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+        val hasPip = packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
+        if (!hasPip) return false
+
+        return runCatching {
+            val paramsBuilder = PictureInPictureParams.Builder()
+                .setAspectRatio(Rational(16, 9))
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                paramsBuilder.setSeamlessResizeEnabled(true)
+            }
+            enterPictureInPictureMode(paramsBuilder.build())
+        }.getOrDefault(false)
     }
 
     private fun handleIncomingIntent(intent: Intent?) {
@@ -74,7 +116,11 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun PureTubeApp(viewModel: MainViewModel) {
+fun PureTubeApp(
+    viewModel: MainViewModel,
+    isInPipMode: Boolean = false,
+    onRequestPipMode: () -> Boolean = { false }
+) {
     val uiState by viewModel.uiState.collectAsState()
     val historyItems by viewModel.watchHistory.collectAsState()
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
@@ -88,6 +134,8 @@ fun PureTubeApp(viewModel: MainViewModel) {
             selectedAudioTrack = uiState.selectedAudioTrack,
             selectedCaption = uiState.selectedCaption,
             playbackSpeed = uiState.playbackSpeed,
+            backgroundPlayEnabled = uiState.backgroundPlayEnabled,
+            isInPipMode = isInPipMode,
             initialSeekPositionMs = uiState.initialSeekPositionMs,
             onSelectQuality = { quality, currentPos ->
                 viewModel.selectQuality(quality, currentPos)
@@ -101,6 +149,10 @@ fun PureTubeApp(viewModel: MainViewModel) {
             onSelectSpeed = { speed ->
                 viewModel.setPlaybackSpeed(speed)
             },
+            onToggleBackgroundPlay = { enabled ->
+                viewModel.setBackgroundPlayEnabled(enabled)
+            },
+            onRequestPipMode = onRequestPipMode,
             onProgressUpdate = { currentPos ->
                 viewModel.savePlaybackProgress(activeVideo.videoId, currentPos)
             },

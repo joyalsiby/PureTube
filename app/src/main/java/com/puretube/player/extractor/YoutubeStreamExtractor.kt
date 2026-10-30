@@ -44,6 +44,11 @@ data class VideoQualityOption(
     val dashManifestXml: String? = null
 )
 
+data class VideoChapter(
+    val title: String,
+    val startTimeSeconds: Long
+)
+
 data class ExtractedVideo(
     val videoId: String,
     val originalUrl: String,
@@ -55,6 +60,7 @@ data class ExtractedVideo(
     val viewCount: Long = -1L,
     val uploadDate: String = "",
     val likeCount: Long = -1L,
+    val chapters: List<VideoChapter> = emptyList(),
     val hlsUrl: String?,
     val dashUrl: String?,
     val bestAudioUrl: String?,
@@ -115,6 +121,7 @@ object YoutubeStreamExtractor {
             val uploadDate = runCatching { extractor.textualUploadDate }.getOrNull()?.trim().orEmpty()
             val rawDescription = runCatching { extractor.description?.content }.getOrNull().orEmpty()
             val cleanDescription = formatDescriptionText(rawDescription)
+            val chapters = extractChapters(extractor, cleanDescription, durationSeconds)
             val streamType = runCatching { extractor.streamType }.getOrDefault(StreamType.VIDEO_STREAM)
             val hlsUrl = if (streamType == StreamType.LIVE_STREAM) {
                 runCatching { extractor.hlsUrl }.getOrNull()?.takeIf { it.isNotBlank() }
@@ -225,6 +232,7 @@ object YoutubeStreamExtractor {
                 viewCount = viewCount,
                 uploadDate = uploadDate,
                 likeCount = likeCount,
+                chapters = chapters,
                 hlsUrl = hlsUrl,
                 dashUrl = dashUrl,
                 bestAudioUrl = bestAudioUrl,
@@ -477,5 +485,75 @@ object YoutubeStreamExtractor {
         return decoded
             .replace(Regex("\n{3,}"), "\n\n")
             .trim()
+    }
+
+    private fun extractChapters(
+        extractor: org.schabi.newpipe.extractor.stream.StreamExtractor,
+        descriptionText: String,
+        durationSeconds: Long
+    ): List<VideoChapter> {
+        val fromSegments = runCatching {
+            extractor.streamSegments
+        }.getOrDefault(emptyList())
+            .mapNotNull { seg ->
+                val title = seg.title?.trim().orEmpty()
+                val startSec = seg.startTimeSeconds.toLong().coerceAtLeast(0L)
+                if (title.isNotEmpty() && (durationSeconds <= 0L || startSec < durationSeconds)) {
+                    VideoChapter(title = title, startTimeSeconds = startSec)
+                } else {
+                    null
+                }
+            }
+            .distinctBy { it.startTimeSeconds }
+            .sortedBy { it.startTimeSeconds }
+
+        if (fromSegments.isNotEmpty()) {
+            return fromSegments
+        }
+
+        // Fallback: parse chapter timestamps from lines in the description
+        if (descriptionText.isBlank()) return emptyList()
+        val lineTimestampRegex = Regex("""(?:^|\s)(\d{1,2}:\d{2}(?::\d{2})?)(?:\s|$)""")
+        val parsed = mutableListOf<VideoChapter>()
+
+        descriptionText.lines().forEach { rawLine ->
+            val line = rawLine.trim()
+            if (line.isEmpty()) return@forEach
+            val match = lineTimestampRegex.find(line) ?: return@forEach
+            val tsText = match.groupValues[1]
+            val sec = parseTimestampToSeconds(tsText) ?: return@forEach
+            if (durationSeconds > 0L && sec >= durationSeconds) return@forEach
+
+            val titlePart = line
+                .removeRange(match.range)
+                .trim(' ', '-', '–', '—', ':', '|', '•', '·', '(', ')', '[', ']')
+                .trim()
+            if (titlePart.length in 2..90) {
+                parsed.add(VideoChapter(title = titlePart, startTimeSeconds = sec))
+            }
+        }
+
+        val deduplicated = parsed
+            .distinctBy { it.startTimeSeconds }
+            .sortedBy { it.startTimeSeconds }
+
+        return if (deduplicated.size >= 2) deduplicated else emptyList()
+    }
+
+    fun parseTimestampToSeconds(timestamp: String): Long? {
+        val parts = timestamp.trim().split(":").map { it.toLongOrNull() ?: return null }
+        return when (parts.size) {
+            2 -> {
+                val (m, s) = parts
+                if (s !in 0..59) return null
+                m * 60L + s
+            }
+            3 -> {
+                val (h, m, s) = parts
+                if (m !in 0..59 || s !in 0..59) return null
+                h * 3600L + m * 60L + s
+            }
+            else -> null
+        }
     }
 }

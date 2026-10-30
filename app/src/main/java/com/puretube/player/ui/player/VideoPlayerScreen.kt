@@ -6,6 +6,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
+import android.media.AudioManager
 import android.net.Uri
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -48,6 +49,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.BrightnessHigh
+import androidx.compose.material.icons.rounded.BrightnessLow
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ChevronRight
 import androidx.compose.material.icons.rounded.ClosedCaption
@@ -57,21 +60,26 @@ import androidx.compose.material.icons.rounded.CropFree
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.FitScreen
+import androidx.compose.material.icons.rounded.FormatListBulleted
 import androidx.compose.material.icons.rounded.Forward10
 import androidx.compose.material.icons.rounded.Fullscreen
 import androidx.compose.material.icons.rounded.FullscreenExit
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.HighQuality
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.Pause
+import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material.icons.rounded.Replay10
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Speed
+import androidx.compose.material.icons.rounded.VolumeOff
+import androidx.compose.material.icons.rounded.VolumeUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -101,11 +109,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -116,6 +129,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
@@ -139,17 +153,25 @@ import com.puretube.player.extractor.CaptionOption
 import com.puretube.player.extractor.ExtractedVideo
 import com.puretube.player.extractor.VideoQualityOption
 import com.puretube.player.extractor.YoutubeHttpDataSource
+import com.puretube.player.extractor.YoutubeStreamExtractor
 import com.puretube.player.ui.screens.formatDurationSeconds
 import kotlinx.coroutines.delay
 import java.io.ByteArrayInputStream
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 private val YouTubeRed = Color(0xFFFF0000)
+private val YouTubeBlueLink = Color(0xFF3EA6FF)
 private val YouTubeDarkBackground = Color(0xFF0F0F0F)
 private val YouTubeChipSurface = Color(0xFF272727)
 private val YouTubeCardSurface = Color(0xFF1A1A1A)
 
 private enum class SeekSide {
     LEFT, RIGHT
+}
+
+private enum class GestureHudType {
+    BRIGHTNESS, VOLUME
 }
 
 @OptIn(UnstableApi::class)
@@ -161,17 +183,24 @@ fun VideoPlayerScreen(
     selectedAudioTrack: AudioTrackOption?,
     selectedCaption: CaptionOption?,
     playbackSpeed: Float,
+    backgroundPlayEnabled: Boolean = true,
+    isInPipMode: Boolean = false,
     initialSeekPositionMs: Long,
     onSelectQuality: (VideoQualityOption, Long) -> Unit,
     onSelectAudioTrack: (AudioTrackOption, Long) -> Unit,
     onSelectCaption: (CaptionOption?, Long) -> Unit,
     onSelectSpeed: (Float) -> Unit,
+    onToggleBackgroundPlay: (Boolean) -> Unit = {},
+    onRequestPipMode: () -> Boolean = { false },
     onProgressUpdate: (Long) -> Unit,
     onClosePlayer: (Long) -> Unit
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
     val lifecycleOwner = LocalLifecycleOwner.current
+    val audioManager = remember(context) {
+        context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+    }
 
     var isPlaying by remember { mutableStateOf(true) }
     var playbackState by remember { mutableStateOf(Player.STATE_BUFFERING) }
@@ -191,10 +220,14 @@ fun VideoPlayerScreen(
     var showAudioSheet by remember { mutableStateOf(false) }
     var showCaptionSheet by remember { mutableStateOf(false) }
     var showSpeedSheet by remember { mutableStateOf(false) }
+    var showChaptersSheet by remember { mutableStateOf(false) }
     var isDescriptionExpanded by remember { mutableStateOf(false) }
 
     var seekFeedbackSide by remember { mutableStateOf<SeekSide?>(null) }
     var zoomFeedbackText by remember { mutableStateOf<String?>(null) }
+    var gestureHudType by remember { mutableStateOf<GestureHudType?>(null) }
+    var gestureHudFraction by remember { mutableFloatStateOf(0.5f) }
+    var isGestureDragging by remember { mutableStateOf(false) }
 
     val dataSourceFactory = remember {
         YoutubeHttpDataSource.Factory()
@@ -218,8 +251,15 @@ fun VideoPlayerScreen(
         val renderersFactory = DefaultRenderersFactory(context)
             .setEnableDecoderFallback(true)
 
+        val audioAttributes = AudioAttributes.Builder()
+            .setUsage(C.USAGE_MEDIA)
+            .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+            .build()
+
         ExoPlayer.Builder(context, renderersFactory)
             .setLoadControl(loadControl)
+            .setAudioAttributes(audioAttributes, /* handleAudioFocus = */ true)
+            .setWakeMode(C.WAKE_MODE_NETWORK)
             .setVideoScalingMode(C.VIDEO_SCALING_MODE_SCALE_TO_FIT)
             .setSeekBackIncrementMs(10_000L)
             .setSeekForwardIncrementMs(10_000L)
@@ -392,12 +432,15 @@ fun VideoPlayerScreen(
         }
     }
 
-    // Pause player if app goes to background
-    DisposableEffect(lifecycleOwner) {
+    // Handle background audio & Picture-in-Picture (PiP) when app goes to background
+    DisposableEffect(lifecycleOwner, backgroundPlayEnabled, isInPipMode) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_STOP) {
                 onProgressUpdate(exoPlayer.currentPosition)
-                exoPlayer.pause()
+                val inPipNow = isInPipMode || (activity?.isInPictureInPictureMode == true)
+                if (!inPipNow && !backgroundPlayEnabled) {
+                    exoPlayer.pause()
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -438,7 +481,8 @@ fun VideoPlayerScreen(
     }
 
     // Auto-hide controls after 3.5 seconds of playing
-    val anySheetOpen = showSettingsSheet || showQualitySheet || showAudioSheet || showCaptionSheet || showSpeedSheet
+    val anySheetOpen = showSettingsSheet || showQualitySheet || showAudioSheet ||
+        showCaptionSheet || showSpeedSheet || showChaptersSheet
     LaunchedEffect(controlsVisible, isPlaying, isScrubbing, anySheetOpen) {
         if (controlsVisible && isPlaying && !isScrubbing && !anySheetOpen) {
             delay(3500L)
@@ -459,6 +503,14 @@ fun VideoPlayerScreen(
         if (zoomFeedbackText != null) {
             delay(1100L)
             zoomFeedbackText = null
+        }
+    }
+
+    // Clear brightness / volume HUD 850ms after vertical drag ends
+    LaunchedEffect(isGestureDragging, gestureHudType) {
+        if (!isGestureDragging && gestureHudType != null) {
+            delay(850L)
+            gestureHudType = null
         }
     }
 
@@ -504,10 +556,10 @@ fun VideoPlayerScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(if (isFullscreenLandscape) Color.Black else YouTubeDarkBackground)
+            .background(if (isFullscreenLandscape || isInPipMode) Color.Black else YouTubeDarkBackground)
     ) {
         // Status bar safe inset in portrait mode so the top of the 16:9 player is never covered by clock/battery
-        if (!isFullscreenLandscape) {
+        if (!isFullscreenLandscape && !isInPipMode) {
             Spacer(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -516,8 +568,8 @@ fun VideoPlayerScreen(
             )
         }
 
-        // VIDEO SURFACE CONTAINER (16:9 at top in Portrait, full-screen in Landscape)
-        val playerContainerModifier = if (isFullscreenLandscape) {
+        // VIDEO SURFACE CONTAINER (16:9 at top in Portrait, full-screen in Landscape or PiP)
+        val playerContainerModifier = if (isFullscreenLandscape || isInPipMode) {
             Modifier
                 .fillMaxSize()
                 .background(Color.Black)
@@ -530,17 +582,42 @@ fun VideoPlayerScreen(
 
         Box(
             modifier = playerContainerModifier
-                // Two-finger Pinch-to-Zoom gesture:
-                // - In Fullscreen: Pinch Out -> "Zoomed to fill" (RESIZE_MODE_ZOOM), Pinch In -> "Original" (RESIZE_MODE_FIT)
-                // - In Portrait: Pinch Out -> Enters Fullscreen automatically (just like YouTube!)
-                .pointerInput(isFullscreenLandscape, isControlsLocked) {
+                // Combined Multi-Touch Pinch-to-Zoom + Fullscreen Vertical Swipe Brightness/Volume Gestures:
+                // 1) Two fingers: Pinch Out -> "Zoomed to fill" (or enter fullscreen from portrait), Pinch In -> "Original"
+                // 2) Single finger vertical drag in Fullscreen: Left half -> Brightness, Right half -> Volume
+                .pointerInput(isFullscreenLandscape, isControlsLocked, isInPipMode) {
+                    if (isInPipMode) return@pointerInput
                     awaitEachGesture {
-                        awaitFirstDown(requireUnconsumed = false)
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        val startX = down.position.x
+                        val startY = down.position.y
+                        val viewW = size.width.toFloat().coerceAtLeast(1f)
+                        val viewH = size.height.toFloat().coerceAtLeast(1f)
+                        val touchSlop = viewConfiguration.touchSlop
+
                         var zoomAccumulator = 1f
+                        var isMultiTouch = false
+                        var isVerticalSwipe = false
+                        var totalDx = 0f
+                        var totalDy = 0f
+                        val isLeftSide = startX < viewW * 0.5f
+                        // Avoid triggering vertical swipe if gesture starts at very top/bottom system bar / seekbar edges
+                        val inVerticalSwipeZone = isFullscreenLandscape &&
+                            !isControlsLocked &&
+                            startY in (viewH * 0.12f)..(viewH * 0.82f)
+
+                        var swipeValueFraction = 0.5f
+
                         do {
                             val event = awaitPointerEvent()
                             val pressedCount = event.changes.count { it.pressed }
+
                             if (pressedCount >= 2 && !isControlsLocked) {
+                                isMultiTouch = true
+                                if (isVerticalSwipe) {
+                                    isVerticalSwipe = false
+                                    isGestureDragging = false
+                                }
                                 val zoomChange = event.calculateZoom()
                                 if (zoomChange != 1f) {
                                     zoomAccumulator *= zoomChange
@@ -561,11 +638,68 @@ fun VideoPlayerScreen(
                                             zoomAccumulator = 1f
                                         }
                                     }
-                                    // Consume multi-touch events so single-tap doesn't fire when lifting fingers
                                     event.changes.forEach { it.consume() }
+                                }
+                            } else if (pressedCount == 1 && !isMultiTouch && inVerticalSwipeZone) {
+                                val change = event.changes.firstOrNull()
+                                if (change != null && change.pressed) {
+                                    val delta = change.positionChange()
+                                    totalDx += delta.x
+                                    totalDy += delta.y
+
+                                    if (!isVerticalSwipe) {
+                                        if (abs(totalDy) > touchSlop && abs(totalDy) > abs(totalDx) * 1.35f) {
+                                            isVerticalSwipe = true
+                                            isGestureDragging = true
+                                            if (isLeftSide) {
+                                                val currentBright = activity?.window?.attributes?.screenBrightness ?: -1f
+                                                swipeValueFraction = if (currentBright in 0.01f..1.0f) {
+                                                    currentBright
+                                                } else {
+                                                    0.5f
+                                                }
+                                                gestureHudType = GestureHudType.BRIGHTNESS
+                                                gestureHudFraction = swipeValueFraction
+                                            } else {
+                                                val maxVol = (audioManager?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 15).coerceAtLeast(1)
+                                                val curVol = audioManager?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: (maxVol / 2)
+                                                swipeValueFraction = (curVol.toFloat() / maxVol.toFloat()).coerceIn(0f, 1f)
+                                                gestureHudType = GestureHudType.VOLUME
+                                                gestureHudFraction = swipeValueFraction
+                                            }
+                                            change.consume()
+                                        }
+                                    } else {
+                                        // Dragging up (negative delta.y) increases brightness/volume
+                                        val sensitivity = viewH * 0.65f
+                                        val deltaFraction = (-delta.y / sensitivity)
+                                        swipeValueFraction = (swipeValueFraction + deltaFraction).coerceIn(0f, 1f)
+                                        gestureHudFraction = swipeValueFraction
+
+                                        if (isLeftSide) {
+                                            gestureHudType = GestureHudType.BRIGHTNESS
+                                            activity?.window?.let { win ->
+                                                val lp = win.attributes
+                                                lp.screenBrightness = swipeValueFraction.coerceIn(0.01f, 1.0f)
+                                                win.attributes = lp
+                                            }
+                                        } else {
+                                            gestureHudType = GestureHudType.VOLUME
+                                            audioManager?.let { am ->
+                                                val maxVol = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+                                                val targetVol = (swipeValueFraction * maxVol).roundToInt().coerceIn(0, maxVol)
+                                                am.setStreamVolume(AudioManager.STREAM_MUSIC, targetVol, 0)
+                                            }
+                                        }
+                                        change.consume()
+                                    }
                                 }
                             }
                         } while (event.changes.any { it.pressed })
+
+                        if (isVerticalSwipe) {
+                            isGestureDragging = false
+                        }
                     }
                 }
                 // Single-tap (toggle controls) & Double-tap (-10s / +10s seek)
@@ -726,19 +860,74 @@ fun VideoPlayerScreen(
                 }
             }
 
+            // Vertical Swipe Brightness / Volume HUD Pill (Fullscreen Gesture Feedback)
+            androidx.compose.animation.AnimatedVisibility(
+                visible = gestureHudType != null && !isInPipMode,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 24.dp)
+            ) {
+                val hudPercent = (gestureHudFraction * 100f).roundToInt().coerceIn(0, 100)
+                val hudIcon = when (gestureHudType) {
+                    GestureHudType.BRIGHTNESS -> if (hudPercent < 45) Icons.Rounded.BrightnessLow else Icons.Rounded.BrightnessHigh
+                    GestureHudType.VOLUME -> if (hudPercent == 0) Icons.Rounded.VolumeOff else Icons.Rounded.VolumeUp
+                    null -> Icons.Rounded.VolumeUp
+                }
+                val hudTitle = if (gestureHudType == GestureHudType.BRIGHTNESS) "Brightness" else "Volume"
+
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = Color.Black.copy(alpha = 0.82f)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
+                    ) {
+                        Icon(
+                            imageVector = hudIcon,
+                            contentDescription = hudTitle,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Box(
+                            modifier = Modifier
+                                .width(96.dp)
+                                .height(5.dp)
+                                .background(Color.White.copy(alpha = 0.25f), RoundedCornerShape(3.dp))
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth(gestureHudFraction.coerceIn(0f, 1f))
+                                    .height(5.dp)
+                                    .background(YouTubeRed, RoundedCornerShape(3.dp))
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "$hudPercent%",
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+
             // Buffering Spinner (White ring like YouTube player)
             if (playbackState == Player.STATE_BUFFERING) {
                 CircularProgressIndicator(
                     color = Color.White,
                     strokeWidth = 3.dp,
                     modifier = Modifier
-                        .size(48.dp)
+                        .size(if (isInPipMode) 28.dp else 48.dp)
                         .align(Alignment.Center)
                 )
             }
 
             // Locked Screen Overlay (When user locks screen from YouTube Settings menu)
-            if (isControlsLocked) {
+            if (isControlsLocked && !isInPipMode) {
                 androidx.compose.animation.AnimatedVisibility(
                     visible = controlsVisible,
                     enter = fadeIn(),
@@ -774,7 +963,7 @@ fun VideoPlayerScreen(
                         }
                     }
                 }
-            } else {
+            } else if (!isInPipMode) {
                 // ORIGINAL YOUTUBE PLAYER CONTROLS OVERLAY
                 androidx.compose.animation.AnimatedVisibility(
                     visible = controlsVisible || playbackState == Player.STATE_ENDED,
@@ -922,6 +1111,20 @@ fun VideoPlayerScreen(
                                 }
                             }
 
+                            // Picture-in-Picture (PiP) Top Bar Icon Button
+                            IconButton(
+                                onClick = {
+                                    onRequestPipMode()
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.PictureInPictureAlt,
+                                    contentDescription = "Picture-in-Picture (PiP)",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+
                             // YouTube Settings Gear Icon Button
                             IconButton(onClick = { showSettingsSheet = true }) {
                                 Icon(
@@ -1033,7 +1236,20 @@ fun VideoPlayerScreen(
                             }
                             val displayTotalSeconds = (durationMs / 1000L).coerceAtLeast(0L)
 
-                            // Scrubbing time preview bubble above seekbar
+                            val activeChapter = remember(video.chapters, displayCurrentSeconds) {
+                                video.chapters.lastOrNull { it.startTimeSeconds <= displayCurrentSeconds }
+                            }
+                            val chapterFractions = remember(video.chapters, displayTotalSeconds) {
+                                if (displayTotalSeconds <= 0L || video.chapters.isEmpty()) {
+                                    emptyList()
+                                } else {
+                                    video.chapters
+                                        .map { it.startTimeSeconds.toFloat() / displayTotalSeconds.toFloat() }
+                                        .filter { it in 0.01f..0.99f }
+                                }
+                            }
+
+                            // Scrubbing time + chapter preview bubble above seekbar
                             AnimatedVisibility(
                                 visible = isScrubbing,
                                 enter = fadeIn(),
@@ -1046,32 +1262,64 @@ fun VideoPlayerScreen(
                                     shape = RoundedCornerShape(16.dp),
                                     color = Color.Black.copy(alpha = 0.85f)
                                 ) {
+                                    val previewLabel = if (activeChapter != null) {
+                                        "${formatDurationSeconds(displayCurrentSeconds)}  •  ${activeChapter.title}"
+                                    } else {
+                                        formatDurationSeconds(displayCurrentSeconds)
+                                    }
                                     Text(
-                                        text = formatDurationSeconds(displayCurrentSeconds),
+                                        text = previewLabel,
                                         style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
                                         color = Color.White,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
                                         modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                                     )
                                 }
                             }
 
-                            // Row 1: Timestamp (0:12 / 4:20) on left + Quality badge & Fullscreen icon on right
+                            // Row 1: Timestamp (0:12 / 4:20 • Chapter >) on left + Quality badge & Fullscreen icon on right
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = buildAnnotatedString {
-                                        withStyle(SpanStyle(color = Color.White, fontWeight = FontWeight.SemiBold)) {
-                                            append(formatDurationSeconds(displayCurrentSeconds))
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .weight(1f, fill = false)
+                                        .clickable(enabled = video.chapters.isNotEmpty()) {
+                                            showChaptersSheet = true
                                         }
-                                        withStyle(SpanStyle(color = Color.White.copy(alpha = 0.7f))) {
-                                            append(" / ${formatDurationSeconds(displayTotalSeconds)}")
-                                        }
-                                    },
-                                    style = MaterialTheme.typography.labelMedium
-                                )
+                                ) {
+                                    Text(
+                                        text = buildAnnotatedString {
+                                            withStyle(SpanStyle(color = Color.White, fontWeight = FontWeight.SemiBold)) {
+                                                append(formatDurationSeconds(displayCurrentSeconds))
+                                            }
+                                            withStyle(SpanStyle(color = Color.White.copy(alpha = 0.7f))) {
+                                                append(" / ${formatDurationSeconds(displayTotalSeconds)}")
+                                            }
+                                            if (activeChapter != null) {
+                                                withStyle(SpanStyle(color = Color.White.copy(alpha = 0.9f), fontWeight = FontWeight.SemiBold)) {
+                                                    append("  •  ${activeChapter.title}")
+                                                }
+                                            }
+                                        },
+                                        style = MaterialTheme.typography.labelMedium,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
+                                    if (activeChapter != null) {
+                                        Icon(
+                                            imageVector = Icons.Rounded.ChevronRight,
+                                            contentDescription = "View chapters",
+                                            tint = Color.White.copy(alpha = 0.8f),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     // Subtle current resolution badge next to fullscreen icon
@@ -1112,10 +1360,11 @@ fun VideoPlayerScreen(
                                 }
                             }
 
-                            // Row 2: Authentic YouTube Red Seekbar with Buffered Progress Track
+                            // Row 2: Authentic YouTube Red Seekbar with Buffered Progress Track & Chapter Markers
                             YouTubeSeekBar(
                                 value = sliderFraction,
                                 bufferedFraction = bufferedFraction,
+                                chapterFractions = chapterFractions,
                                 isScrubbing = isScrubbing,
                                 onValueChange = { fraction ->
                                     isScrubbing = true
@@ -1172,6 +1421,13 @@ fun VideoPlayerScreen(
                                             isActive = selectedCaption != null,
                                             onClick = { showCaptionSheet = true }
                                         )
+                                        if (video.chapters.isNotEmpty()) {
+                                            FullscreenQuickPill(
+                                                icon = Icons.Rounded.FormatListBulleted,
+                                                label = "Chapters (${video.chapters.size})",
+                                                onClick = { showChaptersSheet = true }
+                                            )
+                                        }
                                     }
 
                                     Spacer(modifier = Modifier.width(12.dp))
@@ -1207,7 +1463,7 @@ fun VideoPlayerScreen(
         }
 
         // PORTRAIT WATCH PAGE DETAILS BELOW THE 16:9 VIDEO PLAYER (Original YouTube Watch UI Layout)
-        if (!isFullscreenLandscape) {
+        if (!isFullscreenLandscape && !isInPipMode) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1238,6 +1494,9 @@ fun VideoPlayerScreen(
                         if (selectedCaption != null) {
                             append("  ·  CC: ")
                             append(selectedCaption.languageCode.uppercase())
+                        }
+                        if (backgroundPlayEnabled) {
+                            append("  ·  Bg Play")
                         }
                         append("  ·  Ad-Free Stream")
                     },
@@ -1312,7 +1571,7 @@ fun VideoPlayerScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // YouTube-style Horizontal Action Pills Row (Quality, Audio, Captions, Speed, Fullscreen, Share, Copy)
+                // YouTube-style Horizontal Action Pills Row (Quality, Audio, Captions, Chapters, Speed, Bg Play, PiP, Fullscreen, Share, Copy)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1351,10 +1610,31 @@ fun VideoPlayerScreen(
                         onClick = { showCaptionSheet = true }
                     )
 
+                    if (video.chapters.isNotEmpty()) {
+                        YouTubeActionChip(
+                            icon = Icons.Rounded.FormatListBulleted,
+                            label = "Chapters (${video.chapters.size})",
+                            onClick = { showChaptersSheet = true }
+                        )
+                    }
+
                     YouTubeActionChip(
                         icon = Icons.Rounded.Speed,
                         label = "Speed: $currentSpeedLabel",
                         onClick = { showSpeedSheet = true }
+                    )
+
+                    YouTubeActionChip(
+                        icon = Icons.Rounded.Headphones,
+                        label = if (backgroundPlayEnabled) "Bg Play: On" else "Bg Play: Off",
+                        isHighlighted = backgroundPlayEnabled,
+                        onClick = { onToggleBackgroundPlay(!backgroundPlayEnabled) }
+                    )
+
+                    YouTubeActionChip(
+                        icon = Icons.Rounded.PictureInPictureAlt,
+                        label = "PiP",
+                        onClick = { onRequestPipMode() }
                     )
 
                     YouTubeActionChip(
@@ -1390,7 +1670,7 @@ fun VideoPlayerScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // YouTube-style Expandable Video Description Card
+                // YouTube-style Expandable Video Description Card with Clickable Timestamps
                 Surface(
                     onClick = { isDescriptionExpanded = !isDescriptionExpanded },
                     shape = RoundedCornerShape(12.dp),
@@ -1450,17 +1730,35 @@ fun VideoPlayerScreen(
                         }
 
                         val bodyText = video.description.ifBlank { "No description provided for this video." }
+                        val annotatedDescription = remember(bodyText, video.durationSeconds) {
+                            buildClickableDescriptionAnnotatedString(
+                                text = bodyText,
+                                maxDurationSeconds = video.durationSeconds,
+                                onTimestampClick = { targetSeconds ->
+                                    val seekMs = (targetSeconds * 1000L).coerceAtLeast(0L)
+                                    exoPlayer.seekTo(seekMs)
+                                    exoPlayer.play()
+                                    currentPositionMs = seekMs
+                                    Toast.makeText(
+                                        context,
+                                        "Jumped to ${formatDurationSeconds(targetSeconds)}",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            )
+                        }
+
                         if (isDescriptionExpanded) {
                             SelectionContainer {
                                 Text(
-                                    text = bodyText,
+                                    text = annotatedDescription,
                                     style = MaterialTheme.typography.bodySmall.copy(lineHeight = 19.sp),
                                     color = Color.White.copy(alpha = 0.86f)
                                 )
                             }
                         } else {
                             Text(
-                                text = bodyText,
+                                text = annotatedDescription,
                                 style = MaterialTheme.typography.bodySmall.copy(lineHeight = 18.sp),
                                 color = Color.White.copy(alpha = 0.75f),
                                 maxLines = 3,
@@ -1542,12 +1840,73 @@ fun VideoPlayerScreen(
                     )
                 }
 
+                // 5. Video Chapters
+                if (video.chapters.isNotEmpty()) {
+                    YouTubeSettingsRow(
+                        icon = Icons.Rounded.FormatListBulleted,
+                        title = "Chapters",
+                        valueText = "${video.chapters.size} chapters",
+                        onClick = {
+                            showSettingsSheet = false
+                            showChaptersSheet = true
+                        }
+                    )
+                }
+
                 HorizontalDivider(
                     color = Color.White.copy(alpha = 0.1f),
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
 
-                // 5. Zoom to fill screen (Pinch fit / fill toggle)
+                // 6. Background audio play toggle
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            onToggleBackgroundPlay(!backgroundPlayEnabled)
+                        }
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Headphones,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Background play",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color.White
+                        )
+                        Text(
+                            text = "Keep audio playing when screen is off or in another app",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.65f)
+                        )
+                    }
+                    Switch(
+                        checked = backgroundPlayEnabled,
+                        onCheckedChange = { checked ->
+                            onToggleBackgroundPlay(checked)
+                        }
+                    )
+                }
+
+                // 7. Picture-in-Picture (PiP) mode
+                YouTubeSettingsRow(
+                    icon = Icons.Rounded.PictureInPictureAlt,
+                    title = "Picture-in-Picture (PiP)",
+                    valueText = "Floating window",
+                    onClick = {
+                        showSettingsSheet = false
+                        onRequestPipMode()
+                    }
+                )
+
+                // 8. Zoom to fill screen (Pinch fit / fill toggle)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1597,7 +1956,7 @@ fun VideoPlayerScreen(
                     )
                 }
 
-                // 6. Lock screen
+                // 9. Lock screen
                 YouTubeSettingsRow(
                     icon = Icons.Rounded.Lock,
                     title = "Lock screen",
@@ -1608,6 +1967,75 @@ fun VideoPlayerScreen(
                         controlsVisible = true
                     }
                 )
+            }
+        }
+    }
+
+    // 0b. Video Chapters Bottom Sheet
+    if (showChaptersSheet && video.chapters.isNotEmpty()) {
+        val currentSec = (currentPositionMs / 1000L).coerceAtLeast(0L)
+        val currentChap = video.chapters.lastOrNull { it.startTimeSeconds <= currentSec }
+
+        ModalBottomSheet(
+            onDismissRequest = { showChaptersSheet = false }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 440.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 24.dp)
+            ) {
+                Text(
+                    text = "Video Chapters (${video.chapters.size})",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+                )
+
+                video.chapters.forEach { chapter ->
+                    val isCurrent = currentChap?.startTimeSeconds == chapter.startTimeSeconds
+                    ListItem(
+                        leadingContent = {
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (isCurrent) {
+                                    YouTubeRed.copy(alpha = 0.18f)
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceContainerHigh
+                                }
+                            ) {
+                                Text(
+                                    text = formatDurationSeconds(chapter.startTimeSeconds),
+                                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = if (isCurrent) YouTubeRed else YouTubeBlueLink,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        },
+                        headlineContent = {
+                            Text(
+                                text = chapter.title,
+                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal
+                            )
+                        },
+                        trailingContent = {
+                            if (isCurrent) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Check,
+                                    contentDescription = "Playing",
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        },
+                        modifier = Modifier.clickable {
+                            val targetMs = chapter.startTimeSeconds * 1000L
+                            exoPlayer.seekTo(targetMs)
+                            exoPlayer.play()
+                            currentPositionMs = targetMs
+                            showChaptersSheet = false
+                        }
+                    )
+                }
             }
         }
     }
@@ -1836,6 +2264,7 @@ fun VideoPlayerScreen(
 private fun YouTubeSeekBar(
     value: Float,
     bufferedFraction: Float,
+    chapterFractions: List<Float> = emptyList(),
     isScrubbing: Boolean,
     onValueChange: (Float) -> Unit,
     onValueChangeFinished: () -> Unit
@@ -1894,6 +2323,20 @@ private fun YouTubeSeekBar(
                         strokeWidth = strokeWidth,
                         cap = StrokeCap.Round
                     )
+                }
+
+                // 4. Video Chapter Boundary Tick Marks (YouTube-style dark gap ticks)
+                if (chapterFractions.isNotEmpty()) {
+                    val gapWidth = 2.5.dp.toPx()
+                    chapterFractions.forEach { frac ->
+                        val tickX = size.width * frac.coerceIn(0f, 1f)
+                        drawLine(
+                            color = Color.Black.copy(alpha = 0.9f),
+                            start = Offset(tickX, 0f),
+                            end = Offset(tickX, size.height),
+                            strokeWidth = gapWidth
+                        )
+                    }
                 }
             }
         }
@@ -2040,5 +2483,51 @@ private fun formatCompactCount(count: Long): String {
         count >= 10_000L -> String.format(java.util.Locale.US, "%.1fK", count / 1_000.0).replace(".0K", "K")
         count >= 1_000L -> java.text.NumberFormat.getNumberInstance(java.util.Locale.US).format(count)
         else -> count.toString()
+    }
+}
+
+private val DescriptionTimestampRegex = Regex("""\b(\d{1,2}:\d{2}(?::\d{2})?)\b""")
+
+private fun buildClickableDescriptionAnnotatedString(
+    text: String,
+    maxDurationSeconds: Long,
+    onTimestampClick: (Long) -> Unit
+): AnnotatedString {
+    return buildAnnotatedString {
+        var lastIndex = 0
+        for (match in DescriptionTimestampRegex.findAll(text)) {
+            val start = match.range.first
+            val endExclusive = match.range.last + 1
+            val tsText = match.groupValues[1]
+            val parsedSeconds = YoutubeStreamExtractor.parseTimestampToSeconds(tsText)
+
+            if (start > lastIndex) {
+                append(text.substring(lastIndex, start))
+            }
+
+            if (parsedSeconds != null && (maxDurationSeconds <= 0L || parsedSeconds <= maxDurationSeconds)) {
+                val link = LinkAnnotation.Clickable(
+                    tag = "ts_$parsedSeconds",
+                    styles = TextLinkStyles(
+                        style = SpanStyle(
+                            color = YouTubeBlueLink,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    ),
+                    linkInteractionListener = {
+                        onTimestampClick(parsedSeconds)
+                    }
+                )
+                withLink(link) {
+                    append(tsText)
+                }
+            } else {
+                append(tsText)
+            }
+            lastIndex = endExclusive
+        }
+        if (lastIndex < text.length) {
+            append(text.substring(lastIndex))
+        }
     }
 }

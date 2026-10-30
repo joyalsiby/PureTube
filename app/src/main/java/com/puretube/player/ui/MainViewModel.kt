@@ -28,6 +28,7 @@ data class MainUiState(
     val selectedAudioTrack: AudioTrackOption? = null,
     val selectedCaption: CaptionOption? = null,
     val playbackSpeed: Float = 1.0f,
+    val backgroundPlayEnabled: Boolean = true,
     val initialSeekPositionMs: Long = 0L
 )
 
@@ -166,6 +167,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setPlaybackSpeed(speed: Float) {
         _uiState.update { it.copy(playbackSpeed = speed) }
+    }
+
+    fun setBackgroundPlayEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(backgroundPlayEnabled = enabled) }
     }
 
     fun savePlaybackProgress(videoId: String, positionMs: Long) {

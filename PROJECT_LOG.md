@@ -126,3 +126,23 @@ This document tracks everything built, configured, and improved in the **PureTub
    - Expanded `.gitignore` for Gradle, Android Studio, VS Code, local SDK/toolchains, and compiled binaries.
    - Upgraded `.github/workflows/build-apk.yml` to automatically parse `versionName` and `versionCode` from `app/build.gradle.kts`, name the artifact `PureTube-v<versionName>-debug.apk`, and automatically publish a **GitHub Release** with release notes and attached APK whenever a `v*` tag is pushed.
    - Bumped version to **`v0.3.005`** (`versionCode = 8`, `versionName = "0.3.005"`) and exported [`PureTube-v0.3.005-debug.apk`](file:///f:/Youtube%20Video%20watching%20app/PureTube-v0.3.005-debug.apk) and [`PureTube-debug.apk`](file:///f:/Youtube%20Video%20watching%20app/PureTube-debug.apk).
+
+---
+
+## v0.3.006 — Clickable Timestamps & Video Chapters, Fullscreen Brightness/Volume Swipe Gestures, Background Play, & Picture-in-Picture (PiP)
+
+1. **Clickable Timestamps & Video Chapters ([`YoutubeStreamExtractor.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/extractor/YoutubeStreamExtractor.kt) & [`VideoPlayerScreen.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/player/VideoPlayerScreen.kt)):**
+   - **Chapter Extraction:** Extracts official YouTube chapters (`extractor.streamSegments`) and automatically falls back to parsing chapter lines (`0:00 Intro`, etc.) from the video description.
+   - **Seekbar Chapter Markers & Chapter Sheet:** Renders chapter boundary gap ticks along `YouTubeSeekBar`, shows the active chapter title next to the timestamp (`0:12 / 4:20 • Chapter >`) and inside the scrubbing preview bubble, and adds a **Video Chapters Bottom Sheet** to jump directly to any chapter.
+   - **Clickable Timestamps in Video Description:** Parses all `mm:ss` / `hh:mm:ss` timestamps inside the portrait description card as clickable YouTube Blue (`#3EA6FF`) links (`LinkAnnotation.Clickable`) that immediately seek the player on tap.
+
+2. **Fullscreen Vertical Swipe Brightness & Volume Gestures ([`VideoPlayerScreen.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/player/VideoPlayerScreen.kt)):**
+   - Added single-finger vertical drag gestures in fullscreen landscape mode that coexist seamlessly with 2-finger pinch-to-zoom and single/double-tap gestures:
+     - **Left Half Vertical Drag:** Adjusts screen brightness (`0%–100%`) via `window.attributes.screenBrightness`.
+     - **Right Half Vertical Drag:** Adjusts media stream volume (`0%–100%`) via `AudioManager.STREAM_MUSIC`.
+     - Displays a sleek top-center HUD pill with icon, progress bar, and percentage.
+
+3. **Background Audio Playback & Picture-in-Picture (PiP) Mode ([`AndroidManifest.xml`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/AndroidManifest.xml), [`MainActivity.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/MainActivity.kt), [`MainViewModel.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/MainViewModel.kt), [`VideoPlayerScreen.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/player/VideoPlayerScreen.kt)):**
+   - **Background Audio Play:** Enabled by default (`Bg Play: On` chip & toggle in `⚙️` Settings). Configures `ExoPlayer` with `C.WAKE_MODE_NETWORK` and `AudioAttributes` (`handleAudioFocus = true`) and keeps audio playing when the screen is turned off or the app is backgrounded.
+   - **Picture-in-Picture (PiP) Mode:** Enabled `android:supportsPictureInPicture="true"` on `MainActivity`, auto-enters 16:9 PiP mode in `onUserLeaveHint()` when pressing Home while watching a video (plus manual `PiP` buttons in the top bar, portrait chips, and Settings sheet), and hides overlays/details while in PiP mode.
+   - Bumped version to **`v0.3.006`** (`versionCode = 9`, `versionName = "0.3.006"`) and exported [`PureTube-v0.3.006-debug.apk`](file:///f:/Youtube%20Video%20watching%20app/PureTube-v0.3.006-debug.apk) and [`PureTube-debug.apk`](file:///f:/Youtube%20Video%20watching%20app/PureTube-debug.apk).
