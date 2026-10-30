@@ -19,22 +19,28 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,6 +54,12 @@ import coil.compose.AsyncImage
 import com.puretube.player.data.WatchHistoryEntity
 import java.util.Locale
 
+private enum class HistoryFilter(val label: String) {
+    ALL("All"),
+    IN_PROGRESS("In Progress"),
+    COMPLETED("Completed")
+}
+
 @Composable
 fun HistoryScreen(
     historyItems: List<WatchHistoryEntity>,
@@ -57,6 +69,29 @@ fun HistoryScreen(
     modifier: Modifier = Modifier
 ) {
     var showClearDialog by remember { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var selectedFilter by rememberSaveable { mutableStateOf(HistoryFilter.ALL) }
+
+    val filteredItems = remember(historyItems, searchQuery, selectedFilter) {
+        val q = searchQuery.trim().lowercase(Locale.getDefault())
+        historyItems.filter { item ->
+            val matchesQuery = q.isEmpty() ||
+                item.title.lowercase(Locale.getDefault()).contains(q) ||
+                item.uploaderName.lowercase(Locale.getDefault()).contains(q)
+
+            val progressRatio = if (item.durationSeconds > 0L) {
+                item.lastPositionMs.toFloat() / (item.durationSeconds * 1000f)
+            } else 0f
+
+            val matchesFilter = when (selectedFilter) {
+                HistoryFilter.ALL -> true
+                HistoryFilter.IN_PROGRESS -> item.lastPositionMs > 0L && progressRatio < 0.90f
+                HistoryFilter.COMPLETED -> progressRatio >= 0.90f
+            }
+
+            matchesQuery && matchesFilter
+        }
+    }
 
     if (showClearDialog) {
         AlertDialog(
@@ -138,17 +173,106 @@ fun HistoryScreen(
                 }
             }
         } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            // Search Bar & Filter Chips
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 4.dp)
             ) {
-                items(historyItems, key = { it.videoId }) { item ->
-                    HistoryVideoCard(
-                        item = item,
-                        onClick = { onPlayHistoryItem(item) },
-                        onDelete = { onDeleteHistoryItem(item.videoId) }
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Search watched videos or channels...") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Rounded.Search,
+                            contentDescription = "Search history"
+                        )
+                    },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Clear,
+                                    contentDescription = "Clear search"
+                                )
+                            }
+                        }
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(24.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainer
                     )
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    HistoryFilter.entries.forEach { filter ->
+                        FilterChip(
+                            selected = selectedFilter == filter,
+                            onClick = { selectedFilter = filter },
+                            label = {
+                                val text = if (filter == HistoryFilter.ALL) {
+                                    "All (${historyItems.size})"
+                                } else {
+                                    filter.label
+                                }
+                                Text(text)
+                            },
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                    }
+                }
+            }
+
+            if (filteredItems.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Rounded.Search,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "No matching history items",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Try a different search keyword or filter.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+                        )
+                    }
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(filteredItems, key = { it.videoId }) { item ->
+                        HistoryVideoCard(
+                            item = item,
+                            onClick = { onPlayHistoryItem(item) },
+                            onDelete = { onDeleteHistoryItem(item.videoId) }
+                        )
+                    }
                 }
             }
         }

@@ -1,5 +1,6 @@
 package com.puretube.player
 
+import android.Manifest
 import android.app.PictureInPictureParams
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -10,7 +11,9 @@ import android.util.Rational
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.core.content.ContextCompat
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -57,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import com.puretube.player.data.AppThemeMode
 import com.puretube.player.extractor.YoutubeStreamExtractor
 import com.puretube.player.ui.MainViewModel
+import com.puretube.player.ui.player.MediaPlaybackNotificationManager
 import com.puretube.player.ui.player.VideoPlayerScreen
 import com.puretube.player.ui.screens.HistoryScreen
 import com.puretube.player.ui.screens.OnboardingScreen
@@ -70,10 +74,16 @@ class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
     private var isInPipModeState by mutableStateOf(false)
+    private var isPlayerCurrentlyPlaying: Boolean = true
+
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* Notification banner shown automatically if granted */ }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        requestNotificationPermissionIfNeeded()
 
         if (savedInstanceState == null) {
             handleIncomingIntent(intent)
@@ -95,8 +105,23 @@ class MainActivity : ComponentActivity() {
                 PureTubeApp(
                     viewModel = viewModel,
                     isInPipMode = isInPipModeState,
-                    onRequestPipMode = ::enterPipIfSupported
+                    onRequestPipMode = ::enterPipIfSupported,
+                    onPlayerPlayingStateChanged = ::updatePipRemoteActions
                 )
+            }
+        }
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val granted = ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            if (!granted) {
+                runCatching {
+                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                }
             }
         }
     }
@@ -109,7 +134,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        // Automatically enter Picture-in-Picture (PiP) mode when pressing Home while watching a video
+        // Automatically enter Picture-in-Picture (PiP) mode when leaving the app while watching a video
         if (viewModel.uiState.value.activeVideo != null && viewModel.appSettings.value.autoPipOnHome) {
             enterPipIfSupported()
         }
@@ -123,6 +148,26 @@ class MainActivity : ComponentActivity() {
         isInPipModeState = isInPictureInPictureMode
     }
 
+    fun updatePipRemoteActions(isPlaying: Boolean) {
+        isPlayerCurrentlyPlaying = isPlaying
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        if (!packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)) return
+
+        runCatching {
+            val paramsBuilder = PictureInPictureParams.Builder()
+                .setAspectRatio(Rational(16, 9))
+                .setActions(MediaPlaybackNotificationManager.buildPipRemoteActions(this, isPlaying))
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                paramsBuilder.setSeamlessResizeEnabled(true)
+                val autoEnter = viewModel.uiState.value.activeVideo != null &&
+                    viewModel.appSettings.value.autoPipOnHome &&
+                    isPlaying
+                paramsBuilder.setAutoEnterEnabled(autoEnter)
+            }
+            setPictureInPictureParams(paramsBuilder.build())
+        }
+    }
+
     fun enterPipIfSupported(): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
         val hasPip = packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
@@ -131,6 +176,12 @@ class MainActivity : ComponentActivity() {
         return runCatching {
             val paramsBuilder = PictureInPictureParams.Builder()
                 .setAspectRatio(Rational(16, 9))
+                .setActions(
+                    MediaPlaybackNotificationManager.buildPipRemoteActions(
+                        this,
+                        isPlayerCurrentlyPlaying
+                    )
+                )
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 paramsBuilder.setSeamlessResizeEnabled(true)
             }
@@ -147,7 +198,7 @@ class MainActivity : ComponentActivity() {
         }
 
         if (!sharedOrViewedUrl.isNullOrBlank()) {
-            val cleanUrl = YoutubeStreamExtractor.extractYoutubeUrl(sharedOrViewedUrl) ?: sharedOrViewedUrl
+            val cleanUrl = YoutubeStreamExtractor.extractYoutubeOrPlaylistUrl(sharedOrViewedUrl) ?: sharedOrViewedUrl
             viewModel.onUrlChanged(cleanUrl)
             viewModel.loadAndPlayUrl(cleanUrl)
         }
@@ -158,7 +209,8 @@ class MainActivity : ComponentActivity() {
 fun PureTubeApp(
     viewModel: MainViewModel,
     isInPipMode: Boolean = false,
-    onRequestPipMode: () -> Boolean = { false }
+    onRequestPipMode: () -> Boolean = { false },
+    onPlayerPlayingStateChanged: (Boolean) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val appSettings by viewModel.appSettings.collectAsState()
@@ -179,7 +231,20 @@ fun PureTubeApp(
             initialSeekPositionMs = uiState.initialSeekPositionMs,
             initialFullscreenLandscape = appSettings.autoFullscreenOnPlay,
             initialControlsLocked = appSettings.autoStartKidsLocked,
+            kidsUnlockMode = appSettings.kidsUnlockMode,
             hideVideoDescription = appSettings.hideVideoDescription,
+            activePlaylist = uiState.activePlaylist,
+            activePlaylistIndex = uiState.activePlaylistIndex,
+            onSelectPlaylistVideo = { index, currentPos ->
+                viewModel.playPlaylistVideoAt(index, currentPos)
+            },
+            onPlayNextInPlaylist = { currentPos ->
+                viewModel.playNextInPlaylist(currentPos)
+            },
+            onPlayPreviousInPlaylist = { currentPos ->
+                viewModel.playPreviousInPlaylist(currentPos)
+            },
+            onPlayerPlayingStateChanged = onPlayerPlayingStateChanged,
             onSelectQuality = { quality, currentPos ->
                 viewModel.selectQuality(quality, currentPos)
             },
@@ -200,6 +265,7 @@ fun PureTubeApp(
                 viewModel.savePlaybackProgress(activeVideo.videoId, currentPos)
             },
             onClosePlayer = { finalPos ->
+                onPlayerPlayingStateChanged(false)
                 viewModel.closePlayer(finalPos)
             }
         )
@@ -419,6 +485,7 @@ fun PureTubeApp(
                 onUpdateBackgroundPlay = viewModel::setBackgroundPlayEnabled,
                 onUpdateAutoPip = viewModel::updateAutoPipOnHome,
                 onUpdateAutoStartKidsLocked = viewModel::updateAutoStartKidsLocked,
+                onUpdateKidsUnlockMode = viewModel::updateKidsUnlockMode,
                 onUpdateAutoFullscreen = viewModel::updateAutoFullscreenOnPlay,
                 onUpdateHideDescription = viewModel::updateHideVideoDescription,
                 onUpdateSaveHistory = viewModel::updateSaveWatchHistory,

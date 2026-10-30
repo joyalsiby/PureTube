@@ -76,6 +76,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.puretube.player.data.AppSettings
 import com.puretube.player.data.AppThemeMode
+import com.puretube.player.data.KidsUnlockMode
 import com.puretube.player.updater.AppUpdateManager
 import com.puretube.player.updater.ReleaseUpdateInfo
 import kotlin.math.roundToInt
@@ -99,6 +100,7 @@ fun SettingsScreen(
     onUpdateBackgroundPlay: (Boolean) -> Unit,
     onUpdateAutoPip: (Boolean) -> Unit,
     onUpdateAutoStartKidsLocked: (Boolean) -> Unit,
+    onUpdateKidsUnlockMode: (KidsUnlockMode) -> Unit = {},
     onUpdateAutoFullscreen: (Boolean) -> Unit,
     onUpdateHideDescription: (Boolean) -> Unit,
     onUpdateSaveHistory: (Boolean) -> Unit,
@@ -114,6 +116,7 @@ fun SettingsScreen(
     var showThemeSheet by remember { mutableStateOf(false) }
     var showQualitySheet by remember { mutableStateOf(false) }
     var showSpeedSheet by remember { mutableStateOf(false) }
+    var showUnlockModeSheet by remember { mutableStateOf(false) }
     var showClearHistoryDialog by remember { mutableStateOf(false) }
 
     if (showClearHistoryDialog) {
@@ -370,6 +373,15 @@ fun SettingsScreen(
 
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
+                    SettingsActionItem(
+                        icon = Icons.Rounded.Lock,
+                        title = "Kids Screen Unlock Method",
+                        subtitle = settings.kidsUnlockMode.label,
+                        onClick = { showUnlockModeSheet = true }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
                     SettingsSwitchItem(
                         icon = Icons.Rounded.Fullscreen,
                         title = "Auto-enter Fullscreen on play",
@@ -454,7 +466,7 @@ fun SettingsScreen(
                     SettingsSwitchItem(
                         icon = Icons.Rounded.Headphones,
                         title = "Background Audio Playback",
-                        subtitle = "Keep audio playing when the screen is turned off or app is minimized",
+                        subtitle = "Off by default · Keep audio playing when screen is off or PiP is closed",
                         checked = settings.backgroundPlayEnabled,
                         onCheckedChange = onUpdateBackgroundPlay
                     )
@@ -464,7 +476,7 @@ fun SettingsScreen(
                     SettingsSwitchItem(
                         icon = Icons.Rounded.PictureInPictureAlt,
                         title = "Auto Picture-in-Picture (PiP)",
-                        subtitle = "Enter floating window automatically when pressing Home while watching",
+                        subtitle = "Float video in a closeable window when leaving app while playing",
                         checked = settings.autoPipOnHome,
                         onCheckedChange = onUpdateAutoPip
                     )
@@ -734,6 +746,46 @@ fun SettingsScreen(
                         modifier = Modifier.clickable {
                             onUpdateDefaultSpeed(speed)
                             showSpeedSheet = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    // Bottom Sheet: Kids Screen Unlock Method
+    if (showUnlockModeSheet) {
+        ModalBottomSheet(onDismissRequest = { showUnlockModeSheet = false }) {
+            Column(modifier = Modifier.padding(bottom = 24.dp)) {
+                Text(
+                    text = "Kids Screen Unlock Method",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp)
+                )
+                KidsUnlockMode.entries.forEach { mode ->
+                    val isSelected = settings.kidsUnlockMode == mode
+                    ListItem(
+                        headlineContent = {
+                            Text(
+                                text = mode.label,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        },
+                        supportingContent = {
+                            Text(text = mode.description)
+                        },
+                        trailingContent = {
+                            if (isSelected) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Check,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        },
+                        modifier = Modifier.clickable {
+                            onUpdateKidsUnlockMode(mode)
+                            showUnlockModeSheet = false
                         }
                     )
                 }

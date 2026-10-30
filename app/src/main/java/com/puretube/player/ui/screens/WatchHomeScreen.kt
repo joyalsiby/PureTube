@@ -25,6 +25,7 @@ import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Link
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.PlaylistPlay
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -32,6 +33,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -40,6 +42,11 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -53,7 +60,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.puretube.player.extractor.YoutubeStreamExtractor
 import com.puretube.player.updater.ReleaseUpdateInfo
 
 @Composable
@@ -70,6 +82,41 @@ fun WatchHomeScreen(
 ) {
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
+    var detectedClipboardUrl by remember { mutableStateOf<String?>(null) }
+    var dismissedClipboardUrl by remember { mutableStateOf<String?>(null) }
+
+    val refreshClipboardDetection = {
+        runCatching {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            val rawClip = clipboard?.primaryClip
+                ?.getItemAt(0)
+                ?.coerceToText(context)
+                ?.toString()
+                ?.trim()
+                .orEmpty()
+            detectedClipboardUrl = YoutubeStreamExtractor.extractYoutubeOrPlaylistUrl(rawClip)
+        }
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        refreshClipboardDetection()
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                refreshClipboardDetection()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    val activeClipboardSuggestion = detectedClipboardUrl?.takeIf { clipUrl ->
+        clipUrl != dismissedClipboardUrl &&
+            YoutubeStreamExtractor.extractYoutubeOrPlaylistUrl(inputUrl) != clipUrl
+    }
 
     Box(
         modifier = modifier
@@ -143,7 +190,7 @@ fun WatchHomeScreen(
                 onValueChange = onUrlChange,
                 modifier = Modifier.fillMaxWidth(),
                 placeholder = {
-                    Text("https://youtube.com/watch?v=...")
+                    Text("https://youtube.com/watch?v=... or playlist?list=...")
                 },
                 leadingIcon = {
                     Icon(
@@ -214,6 +261,115 @@ fun WatchHomeScreen(
                     },
                     shape = RoundedCornerShape(16.dp)
                 )
+            }
+
+            // Smart Clipboard Detection Card (1-Tap Play when a YouTube video or playlist is in clipboard)
+            AnimatedVisibility(visible = activeClipboardSuggestion != null && !isLoading) {
+                val clipUrl = activeClipboardSuggestion.orEmpty()
+                val isPlaylistClip = YoutubeStreamExtractor.extractPlaylistId(clipUrl) != null &&
+                    YoutubeStreamExtractor.extractYoutubeUrl(clipUrl) == null
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = if (isPlaylistClip) {
+                                    Icons.Rounded.PlaylistPlay
+                                } else {
+                                    Icons.Rounded.ContentPaste
+                                },
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isPlaylistClip) {
+                                        "YouTube Playlist detected in clipboard"
+                                    } else {
+                                        "YouTube link detected in clipboard"
+                                    },
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                                )
+                                Text(
+                                    text = clipUrl,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.78f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            IconButton(
+                                onClick = { dismissedClipboardUrl = clipUrl },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Clear,
+                                    contentDescription = "Dismiss clipboard suggestion",
+                                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            FilledTonalButton(
+                                onClick = {
+                                    onUrlChange(clipUrl)
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                Text("Paste Link")
+                            }
+
+                            Button(
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    onUrlChange(clipUrl)
+                                    onWatchClick(clipUrl)
+                                },
+                                modifier = Modifier.weight(1.3f),
+                                shape = RoundedCornerShape(14.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.PlayArrow,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Play Now",
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
             }
 
             // Error Banner

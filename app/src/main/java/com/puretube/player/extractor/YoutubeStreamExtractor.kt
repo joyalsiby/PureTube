@@ -9,6 +9,7 @@ import org.schabi.newpipe.extractor.services.youtube.dashmanifestcreators.Youtub
 import org.schabi.newpipe.extractor.stream.AudioStream
 import org.schabi.newpipe.extractor.stream.AudioTrackType
 import org.schabi.newpipe.extractor.stream.DeliveryMethod
+import org.schabi.newpipe.extractor.stream.StreamInfoItem
 import org.schabi.newpipe.extractor.stream.StreamType
 import org.schabi.newpipe.extractor.stream.VideoStream
 import java.util.Locale
@@ -47,6 +48,22 @@ data class VideoQualityOption(
 data class VideoChapter(
     val title: String,
     val startTimeSeconds: Long
+)
+
+data class PlaylistVideoItem(
+    val videoId: String,
+    val url: String,
+    val title: String,
+    val uploaderName: String,
+    val durationSeconds: Long,
+    val thumbnailUrl: String
+)
+
+data class ExtractedPlaylist(
+    val playlistId: String,
+    val title: String,
+    val uploaderName: String,
+    val videos: List<PlaylistVideoItem>
 )
 
 data class ExtractedVideo(
@@ -98,6 +115,93 @@ object YoutubeStreamExtractor {
         }
 
         return null
+    }
+
+    /**
+     * Extracts a YouTube playlist ID from a playlist link or watch link containing &list=...
+     */
+    fun extractPlaylistId(rawInput: String): String? {
+        val trimmed = rawInput.trim()
+        if (trimmed.isEmpty()) return null
+
+        val listPattern = Pattern.compile(
+            "(?:youtube\\.com|youtu\\.be)[^\\s]*[?&]list=([a-zA-Z0-9_-]{10,})",
+            Pattern.CASE_INSENSITIVE
+        )
+        val matcher = listPattern.matcher(trimmed)
+        if (matcher.find()) {
+            val listId = matcher.group(1).orEmpty()
+            // Ignore algorithmic YouTube Radio/Mix lists (starting with RD) unless no video ID was provided
+            if (listId.isNotEmpty() && (!listId.startsWith("RD", ignoreCase = true) || extractYoutubeUrl(trimmed) == null)) {
+                return listId
+            }
+        }
+        return null
+    }
+
+    /**
+     * Extracts either a clean YouTube watch URL (preserving &list= if present) or a clean playlist URL.
+     */
+    fun extractYoutubeOrPlaylistUrl(rawInput: String): String? {
+        val videoUrl = extractYoutubeUrl(rawInput)
+        val playlistId = extractPlaylistId(rawInput)
+        return when {
+            videoUrl != null && playlistId != null -> "$videoUrl&list=$playlistId"
+            videoUrl != null -> videoUrl
+            playlistId != null -> "https://www.youtube.com/playlist?list=$playlistId"
+            else -> null
+        }
+    }
+
+    /**
+     * Extracts the video items inside a YouTube Playlist with zero external recommendations.
+     */
+    suspend fun extractPlaylist(rawPlaylistInput: String): Result<ExtractedPlaylist> = withContext(Dispatchers.IO) {
+        runCatching {
+            val playlistId = extractPlaylistId(rawPlaylistInput)
+                ?: rawPlaylistInput.trim().takeIf { it.matches(Regex("^[a-zA-Z0-9_-]{10,}$")) }
+                ?: throw IllegalArgumentException("Invalid YouTube playlist link.")
+
+            val playlistUrl = "https://www.youtube.com/playlist?list=$playlistId"
+            val youtubeService = ServiceList.YouTube
+            val playlistExtractor = youtubeService.getPlaylistExtractor(playlistUrl)
+            playlistExtractor.fetchPage()
+
+            val title = runCatching { playlistExtractor.name }.getOrDefault("YouTube Playlist").ifBlank { "YouTube Playlist" }
+            val uploader = runCatching { playlistExtractor.uploaderName }.getOrDefault("YouTube").ifBlank { "YouTube" }
+            val initialPage = runCatching { playlistExtractor.initialPage }.getOrNull()
+
+            val items = initialPage?.items
+                ?.filterIsInstance<StreamInfoItem>()
+                ?.mapNotNull { item ->
+                    val itemUrl = item.url?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                    val cleanVidUrl = extractYoutubeUrl(itemUrl) ?: itemUrl
+                    val vidId = cleanVidUrl.substringAfter("v=").substringBefore("&").ifBlank { cleanVidUrl }
+                    val thumb = item.thumbnails.maxByOrNull { it.height * it.width }?.url
+                        ?.takeIf { it.isNotBlank() }
+                        ?: "https://i.ytimg.com/vi/$vidId/hqdefault.jpg"
+                    PlaylistVideoItem(
+                        videoId = vidId,
+                        url = cleanVidUrl,
+                        title = item.name?.ifBlank { "Video" } ?: "Video",
+                        uploaderName = item.uploaderName?.ifBlank { uploader } ?: uploader,
+                        durationSeconds = item.duration.coerceAtLeast(0L),
+                        thumbnailUrl = thumb
+                    )
+                }
+                .orEmpty()
+
+            if (items.isEmpty()) {
+                throw IllegalStateException("No playable videos found in this playlist.")
+            }
+
+            ExtractedPlaylist(
+                playlistId = playlistId,
+                title = title,
+                uploaderName = uploader,
+                videos = items
+            )
+        }
     }
 
     suspend fun extractStream(rawUrlOrText: String): Result<ExtractedVideo> = withContext(Dispatchers.IO) {

@@ -14,8 +14,8 @@ android {
         minSdk = 24
         targetSdk = 35
         // Version format: X.X.XXX (increment the 3-digit patch number unless 1st/2nd part is explicitly requested)
-        versionCode = 12
-        versionName = "0.3.009"
+        versionCode = 13
+        versionName = "0.3.010"
 
         vectorDrawables {
             useSupportLibrary = true
@@ -97,12 +97,13 @@ dependencies {
     implementation(libs.androidx.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
 
-    // Media3 ExoPlayer
+    // Media3 ExoPlayer & MediaSession
     implementation(libs.androidx.media3.exoplayer)
     implementation(libs.androidx.media3.exoplayer.dash)
     implementation(libs.androidx.media3.exoplayer.hls)
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.common)
+    implementation(libs.androidx.media3.session)
 
     // Room Database
     implementation(libs.androidx.room.runtime)

@@ -6,9 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.puretube.player.PureTubeApplication
 import com.puretube.player.data.AppSettings
 import com.puretube.player.data.AppThemeMode
+import com.puretube.player.data.KidsUnlockMode
 import com.puretube.player.data.WatchHistoryEntity
 import com.puretube.player.extractor.AudioTrackOption
 import com.puretube.player.extractor.CaptionOption
+import com.puretube.player.extractor.ExtractedPlaylist
 import com.puretube.player.extractor.ExtractedVideo
 import com.puretube.player.extractor.VideoQualityOption
 import com.puretube.player.extractor.YoutubeStreamExtractor
@@ -33,8 +35,11 @@ data class MainUiState(
     val selectedAudioTrack: AudioTrackOption? = null,
     val selectedCaption: CaptionOption? = null,
     val playbackSpeed: Float = 1.0f,
-    val backgroundPlayEnabled: Boolean = true,
+    val backgroundPlayEnabled: Boolean = false,
     val initialSeekPositionMs: Long = 0L,
+    // Playlist Queue State
+    val activePlaylist: ExtractedPlaylist? = null,
+    val activePlaylistIndex: Int = 0,
     // Update Manager State
     val availableUpdate: ReleaseUpdateInfo? = null,
     val showUpdateDialog: Boolean = false,
@@ -92,10 +97,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update { it.copy(errorMessage = null) }
     }
 
-    fun loadAndPlayUrl(rawUrl: String, resumePositionMs: Long = 0L) {
+    fun loadAndPlayUrl(
+        rawUrl: String,
+        resumePositionMs: Long = 0L,
+        preserveCurrentPlaylist: Boolean = false
+    ) {
         val target = rawUrl.ifBlank { _uiState.value.inputUrl }.trim()
         if (target.isEmpty()) {
-            _uiState.update { it.copy(errorMessage = "Paste a YouTube link first") }
+            _uiState.update { it.copy(errorMessage = "Paste a YouTube video or playlist link first") }
+            return
+        }
+
+        val cleanVideoUrl = YoutubeStreamExtractor.extractYoutubeUrl(target)
+        val playlistId = YoutubeStreamExtractor.extractPlaylistId(target)
+
+        if (cleanVideoUrl == null && playlistId == null) {
+            _uiState.update {
+                it.copy(errorMessage = "Please enter a valid YouTube video or playlist link.")
+            }
             return
         }
 
@@ -103,74 +122,176 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             it.copy(
                 inputUrl = target,
                 isLoading = true,
-                errorMessage = null
+                errorMessage = null,
+                activePlaylist = if (preserveCurrentPlaylist) it.activePlaylist else null,
+                activePlaylistIndex = if (preserveCurrentPlaylist) it.activePlaylistIndex else 0
             )
         }
 
         viewModelScope.launch {
-            val result = YoutubeStreamExtractor.extractStream(target)
-            result.fold(
-                onSuccess = { extracted ->
-                    val currentSettings = preferences.settings.value
-
-                    // Pick optimal hardware-accelerated stream matching user's preferred resolution
-                    val defaultQuality = YoutubeStreamExtractor.selectDefaultStartupQuality(
-                        qualities = extracted.qualities,
-                        preferredHeight = currentSettings.defaultQualityHeight
-                    )
-
-                    // Always default to Original audio track first
-                    val defaultAudioTrack = extracted.audioTracks.firstOrNull {
-                        it.isOriginal
-                    } ?: extracted.audioTracks.firstOrNull()
-
-                    val existing = historyDao.getByVideoId(extracted.videoId)
-                    val startPosition = if (resumePositionMs > 0L) {
-                        resumePositionMs
-                    } else {
-                        existing?.lastPositionMs?.takeIf {
-                            extracted.durationSeconds > 0 && it < (extracted.durationSeconds * 950L)
-                        } ?: 0L
-                    }
-
-                    if (currentSettings.saveWatchHistory) {
-                        historyDao.upsert(
-                            WatchHistoryEntity(
-                                videoId = extracted.videoId,
-                                url = extracted.originalUrl,
-                                title = extracted.title,
-                                uploaderName = extracted.uploaderName,
-                                thumbnailUrl = extracted.thumbnailUrl,
-                                durationSeconds = extracted.durationSeconds,
-                                lastPositionMs = startPosition,
-                                watchedAtTimestamp = System.currentTimeMillis()
+            // Case 1: Pure playlist URL (no v= parameter) -> extract playlist first, then play item 0
+            if (cleanVideoUrl == null && playlistId != null) {
+                val playlistRes = YoutubeStreamExtractor.extractPlaylist(playlistId)
+                playlistRes.fold(
+                    onSuccess = { playlist ->
+                        val firstVideo = playlist.videos.first()
+                        _uiState.update {
+                            it.copy(
+                                activePlaylist = playlist,
+                                activePlaylistIndex = 0
                             )
+                        }
+                        extractAndStartSingleVideo(
+                            videoUrl = firstVideo.url,
+                            resumePositionMs = 0L
                         )
+                    },
+                    onFailure = { err ->
+                        _uiState.update {
+                            it.copy(
+                                isLoading = false,
+                                errorMessage = err.localizedMessage ?: "Failed to load YouTube playlist."
+                            )
+                        }
                     }
+                )
+                return@launch
+            }
 
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            activeVideo = extracted,
-                            selectedQuality = defaultQuality,
-                            selectedAudioTrack = defaultAudioTrack,
-                            selectedCaption = null,
-                            playbackSpeed = currentSettings.defaultPlaybackSpeed,
-                            backgroundPlayEnabled = currentSettings.backgroundPlayEnabled,
-                            initialSeekPositionMs = startPosition
-                        )
-                    }
-                },
-                onFailure = { err ->
-                    _uiState.update {
-                        it.copy(
-                            isLoading = false,
-                            errorMessage = err.localizedMessage ?: "Failed to extract video stream."
-                        )
+            // Case 2: Video URL that ALSO has a &list= parameter -> start playing video immediately,
+            // and fetch the playlist queue in parallel!
+            if (cleanVideoUrl != null && playlistId != null && !preserveCurrentPlaylist) {
+                launch {
+                    YoutubeStreamExtractor.extractPlaylist(playlistId).onSuccess { playlist ->
+                        val activeVidId = _uiState.value.activeVideo?.videoId
+                            ?: cleanVideoUrl.substringAfter("v=").substringBefore("&")
+                        val matchIdx = playlist.videos.indexOfFirst { it.videoId == activeVidId }.coerceAtLeast(0)
+                        _uiState.update {
+                            it.copy(
+                                activePlaylist = playlist,
+                                activePlaylistIndex = matchIdx
+                            )
+                        }
                     }
                 }
+            }
+
+            extractAndStartSingleVideo(
+                videoUrl = cleanVideoUrl ?: target,
+                resumePositionMs = resumePositionMs
             )
         }
+    }
+
+    private suspend fun extractAndStartSingleVideo(
+        videoUrl: String,
+        resumePositionMs: Long
+    ) {
+        val result = YoutubeStreamExtractor.extractStream(videoUrl)
+        result.fold(
+            onSuccess = { extracted ->
+                val currentSettings = preferences.settings.value
+
+                // Pick optimal hardware-accelerated stream matching user's preferred resolution
+                val defaultQuality = YoutubeStreamExtractor.selectDefaultStartupQuality(
+                    qualities = extracted.qualities,
+                    preferredHeight = currentSettings.defaultQualityHeight
+                )
+
+                // Always default to Original audio track first
+                val defaultAudioTrack = extracted.audioTracks.firstOrNull {
+                    it.isOriginal
+                } ?: extracted.audioTracks.firstOrNull()
+
+                val existing = historyDao.getByVideoId(extracted.videoId)
+                val startPosition = if (resumePositionMs > 0L) {
+                    resumePositionMs
+                } else {
+                    existing?.lastPositionMs?.takeIf {
+                        extracted.durationSeconds > 0 && it < (extracted.durationSeconds * 950L)
+                    } ?: 0L
+                }
+
+                if (currentSettings.saveWatchHistory) {
+                    historyDao.upsert(
+                        WatchHistoryEntity(
+                            videoId = extracted.videoId,
+                            url = extracted.originalUrl,
+                            title = extracted.title,
+                            uploaderName = extracted.uploaderName,
+                            thumbnailUrl = extracted.thumbnailUrl,
+                            durationSeconds = extracted.durationSeconds,
+                            lastPositionMs = startPosition,
+                            watchedAtTimestamp = System.currentTimeMillis()
+                        )
+                    )
+                }
+
+                _uiState.update { state ->
+                    val matchedIndex = state.activePlaylist?.videos
+                        ?.indexOfFirst { it.videoId == extracted.videoId }
+                        ?.takeIf { it >= 0 }
+                        ?: state.activePlaylistIndex
+
+                    state.copy(
+                        isLoading = false,
+                        activeVideo = extracted,
+                        activePlaylistIndex = matchedIndex,
+                        selectedQuality = defaultQuality,
+                        selectedAudioTrack = defaultAudioTrack,
+                        selectedCaption = null,
+                        playbackSpeed = currentSettings.defaultPlaybackSpeed,
+                        backgroundPlayEnabled = currentSettings.backgroundPlayEnabled,
+                        initialSeekPositionMs = startPosition
+                    )
+                }
+            },
+            onFailure = { err ->
+                _uiState.update {
+                    it.copy(
+                        isLoading = false,
+                        errorMessage = err.localizedMessage ?: "Failed to extract video stream."
+                    )
+                }
+            }
+        )
+    }
+
+    fun playPlaylistVideoAt(index: Int, currentPositionMs: Long = 0L) {
+        val playlist = _uiState.value.activePlaylist ?: return
+        val targetItem = playlist.videos.getOrNull(index) ?: return
+        val currentVideo = _uiState.value.activeVideo
+        if (currentVideo != null && currentPositionMs > 0L) {
+            savePlaybackProgress(currentVideo.videoId, currentPositionMs)
+        }
+        _uiState.update {
+            it.copy(
+                activePlaylistIndex = index,
+                isLoading = true
+            )
+        }
+        viewModelScope.launch {
+            extractAndStartSingleVideo(
+                videoUrl = targetItem.url,
+                resumePositionMs = 0L
+            )
+        }
+    }
+
+    fun playNextInPlaylist(currentPositionMs: Long = 0L): Boolean {
+        val playlist = _uiState.value.activePlaylist ?: return false
+        val nextIndex = _uiState.value.activePlaylistIndex + 1
+        if (nextIndex !in playlist.videos.indices) return false
+        playPlaylistVideoAt(nextIndex, currentPositionMs)
+        return true
+    }
+
+    fun playPreviousInPlaylist(currentPositionMs: Long = 0L): Boolean {
+        val playlist = _uiState.value.activePlaylist ?: return false
+        val prevIndex = _uiState.value.activePlaylistIndex - 1
+        if (prevIndex !in playlist.videos.indices) return false
+        playPlaylistVideoAt(prevIndex, currentPositionMs)
+        return true
     }
 
     fun selectQuality(quality: VideoQualityOption, currentPositionMs: Long) {
@@ -236,6 +357,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         _uiState.update {
             it.copy(
                 activeVideo = null,
+                activePlaylist = null,
+                activePlaylistIndex = 0,
                 selectedQuality = null,
                 selectedAudioTrack = null,
                 selectedCaption = null,
@@ -269,6 +392,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun updateAutoPipOnHome(enabled: Boolean) = preferences.setAutoPipOnHome(enabled)
     fun updateAutoStartKidsLocked(enabled: Boolean) = preferences.setAutoStartKidsLocked(enabled)
+    fun updateKidsUnlockMode(mode: KidsUnlockMode) = preferences.setKidsUnlockMode(mode)
     fun updateAutoFullscreenOnPlay(enabled: Boolean) = preferences.setAutoFullscreenOnPlay(enabled)
     fun updateHideVideoDescription(enabled: Boolean) = preferences.setHideVideoDescription(enabled)
     fun updateSaveWatchHistory(enabled: Boolean) = preferences.setSaveWatchHistory(enabled)

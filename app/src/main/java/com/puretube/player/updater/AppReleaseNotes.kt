@@ -23,14 +23,21 @@ import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.BatteryChargingFull
 import androidx.compose.material.icons.rounded.ChildCare
 import androidx.compose.material.icons.rounded.ClosedCaption
+import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FitScreen
 import androidx.compose.material.icons.rounded.FormatListBulleted
 import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.NewReleases
+import androidx.compose.material.icons.rounded.NotificationsActive
 import androidx.compose.material.icons.rounded.PictureInPictureAlt
+import androidx.compose.material.icons.rounded.PlaylistPlay
+import androidx.compose.material.icons.rounded.RepeatOne
 import androidx.compose.material.icons.rounded.RocketLaunch
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.SystemUpdate
 import androidx.compose.material.icons.rounded.TouchApp
@@ -73,6 +80,38 @@ data class VersionReleaseNote(
 object AppReleaseNotes {
 
     val allReleases: List<VersionReleaseNote> = listOf(
+        VersionReleaseNote(
+            versionName = "0.3.010",
+            title = "Media Notification & Closeable PiP, Playlists, Toddler Lock, 2x Hold & More",
+            summary = "YouTube-style media notification & control panel playing indicator, closeable PiP with Background Play off by default, toddler-proof screen unlock, playlists, 2x speed hold, loop toggle, clipboard card & history search.",
+            highlights = listOf(
+                ReleaseHighlightItem(
+                    icon = Icons.Rounded.NotificationsActive,
+                    title = "Media Notification Banner & Closeable PiP (Bg Play Off by Default)",
+                    description = "Added Android Quick Settings Media Control Panel & Notification Banner with Play/Pause, -10s/+10s, seekbar, and Close. Background Play is now OFF by default—leaving the app opens a closeable PiP window with remote controls that pauses immediately when closed."
+                ),
+                ReleaseHighlightItem(
+                    icon = Icons.Rounded.Lock,
+                    title = "Toddler-Proof Kids Screen Unlock (Hold 2s or Parent Math Gate)",
+                    description = "Upgraded Screen Lock so toddlers can't unlock by accident! Defaults to Hold for 2 Seconds (with a live progress bar), or choose Parent Math Challenge (multiplication gate) in Settings."
+                ),
+                ReleaseHighlightItem(
+                    icon = Icons.Rounded.PlaylistPlay,
+                    title = "YouTube Playlist Link Support & Queue Sheet",
+                    description = "Share or paste any YouTube playlist link to watch its videos sequentially with Next/Previous controls and an in-player Playlist Queue sheet—still with zero algorithmic recommendations."
+                ),
+                ReleaseHighlightItem(
+                    icon = Icons.Rounded.FastForward,
+                    title = "Long-Press for 2x Speed & Single-Video Loop Toggle",
+                    description = "Press and hold anywhere on the video to temporarily play at 2.0x speed, and toggle Loop Video from the player chips or Settings (⚙️) sheet."
+                ),
+                ReleaseHighlightItem(
+                    icon = Icons.Rounded.ContentPaste,
+                    title = "Smart Clipboard Card & Watch History Search/Filter",
+                    description = "Auto-detects copied YouTube links on the Watch screen with a 1-tap Play Now card, plus search & filter chips (All, In Progress, Completed) in History."
+                )
+            )
+        ),
         VersionReleaseNote(
             versionName = "0.3.009",
             title = "Welcome Onboarding, In-App Release Notes & Clean Player UI",

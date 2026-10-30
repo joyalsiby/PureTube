@@ -59,6 +59,7 @@ import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.CropFree
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FitScreen
 import androidx.compose.material.icons.rounded.FormatListBulleted
 import androidx.compose.material.icons.rounded.Forward10
@@ -73,30 +74,41 @@ import androidx.compose.material.icons.rounded.LockOpen
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.PlaylistPlay
+import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.RepeatOne
 import androidx.compose.material.icons.rounded.Replay
 import androidx.compose.material.icons.rounded.Replay10
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.SkipNext
+import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.VolumeOff
 import androidx.compose.material.icons.rounded.VolumeUp
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -132,6 +144,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -148,17 +161,23 @@ import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.source.SingleSampleMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
+import coil.compose.AsyncImage
+import com.puretube.player.data.KidsUnlockMode
 import com.puretube.player.extractor.AudioTrackOption
 import com.puretube.player.extractor.CaptionOption
+import com.puretube.player.extractor.ExtractedPlaylist
 import com.puretube.player.extractor.ExtractedVideo
 import com.puretube.player.extractor.VideoQualityOption
 import com.puretube.player.extractor.YoutubeHttpDataSource
 import com.puretube.player.extractor.YoutubeStreamExtractor
 import com.puretube.player.ui.screens.formatDurationSeconds
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.io.ByteArrayInputStream
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.random.Random
 
 private val YouTubeRed = Color(0xFFFF0000)
 private val YouTubeBlueLink = Color(0xFF3EA6FF)
@@ -183,12 +202,19 @@ fun VideoPlayerScreen(
     selectedAudioTrack: AudioTrackOption?,
     selectedCaption: CaptionOption?,
     playbackSpeed: Float,
-    backgroundPlayEnabled: Boolean = true,
+    backgroundPlayEnabled: Boolean = false,
     isInPipMode: Boolean = false,
     initialSeekPositionMs: Long,
     initialFullscreenLandscape: Boolean = false,
     initialControlsLocked: Boolean = false,
+    kidsUnlockMode: KidsUnlockMode = KidsUnlockMode.HOLD_2S,
     hideVideoDescription: Boolean = false,
+    activePlaylist: ExtractedPlaylist? = null,
+    activePlaylistIndex: Int = 0,
+    onSelectPlaylistVideo: (Int, Long) -> Unit = { _, _ -> },
+    onPlayNextInPlaylist: (Long) -> Boolean = { false },
+    onPlayPreviousInPlaylist: (Long) -> Boolean = { false },
+    onPlayerPlayingStateChanged: (Boolean) -> Unit = {},
     onSelectQuality: (VideoQualityOption, Long) -> Unit,
     onSelectAudioTrack: (AudioTrackOption, Long) -> Unit,
     onSelectCaption: (CaptionOption?, Long) -> Unit,
@@ -207,9 +233,9 @@ fun VideoPlayerScreen(
 
     var isPlaying by remember { mutableStateOf(true) }
     var playbackState by remember { mutableStateOf(Player.STATE_BUFFERING) }
-    var currentPositionMs by remember { mutableLongStateOf(initialSeekPositionMs) }
-    var bufferedPositionMs by remember { mutableLongStateOf(initialSeekPositionMs) }
-    var durationMs by remember { mutableLongStateOf(video.durationSeconds * 1000L) }
+    var currentPositionMs by remember(video.videoId) { mutableLongStateOf(initialSeekPositionMs) }
+    var bufferedPositionMs by remember(video.videoId) { mutableLongStateOf(initialSeekPositionMs) }
+    var durationMs by remember(video.videoId) { mutableLongStateOf(video.durationSeconds * 1000L) }
     var isScrubbing by remember { mutableStateOf(false) }
     var scrubPositionFraction by remember { mutableFloatStateOf(0f) }
 
@@ -217,6 +243,8 @@ fun VideoPlayerScreen(
     var isFullscreenLandscape by remember { mutableStateOf(initialFullscreenLandscape) }
     var isZoomedToFill by remember { mutableStateOf(false) }
     var isControlsLocked by remember { mutableStateOf(initialControlsLocked) }
+    var isLoopEnabled by remember { mutableStateOf(false) }
+    var isHold2xSpeedActive by remember { mutableStateOf(false) }
 
     var showSettingsSheet by remember { mutableStateOf(false) }
     var showQualitySheet by remember { mutableStateOf(false) }
@@ -224,13 +252,23 @@ fun VideoPlayerScreen(
     var showCaptionSheet by remember { mutableStateOf(false) }
     var showSpeedSheet by remember { mutableStateOf(false) }
     var showChaptersSheet by remember { mutableStateOf(false) }
+    var showPlaylistSheet by remember { mutableStateOf(false) }
     var isDescriptionExpanded by remember { mutableStateOf(false) }
+
+    // Kids Lock Unlock States (Hold 2s progress & Parent Math Challenge)
+    var unlockHoldProgress by remember { mutableFloatStateOf(0f) }
+    var showMathUnlockDialog by remember { mutableStateOf(false) }
+    var mathFactorA by remember { mutableIntStateOf(6) }
+    var mathFactorB by remember { mutableIntStateOf(7) }
+    var mathOptions by remember { mutableStateOf(listOf(42, 36, 48, 49)) }
+    var mathErrorText by remember { mutableStateOf<String?>(null) }
 
     var seekFeedbackSide by remember { mutableStateOf<SeekSide?>(null) }
     var zoomFeedbackText by remember { mutableStateOf<String?>(null) }
     var gestureHudType by remember { mutableStateOf<GestureHudType?>(null) }
     var gestureHudFraction by remember { mutableFloatStateOf(0.5f) }
     var isGestureDragging by remember { mutableStateOf(false) }
+    var loadedVideoId by remember { mutableStateOf("") }
 
     val dataSourceFactory = remember {
         YoutubeHttpDataSource.Factory()
@@ -270,6 +308,26 @@ fun VideoPlayerScreen(
             .apply {
                 playWhenReady = true
             }
+    }
+
+    // MediaSession & Notification Banner / Quick Settings Media Control Panel Indicator
+    val notificationManager = remember(context, exoPlayer, video.videoId) {
+        MediaPlaybackNotificationManager(
+            context = context,
+            exoPlayer = exoPlayer,
+            videoTitle = video.title,
+            uploaderName = video.uploaderName,
+            onStopAndClosePlayer = {
+                onClosePlayer(exoPlayer.currentPosition)
+            }
+        )
+    }
+
+    DisposableEffect(notificationManager) {
+        notificationManager.updateNotification()
+        onDispose {
+            notificationManager.release()
+        }
     }
 
     // Manage immersive system bars & screen orientation
@@ -319,6 +377,21 @@ fun VideoPlayerScreen(
         selectedAudioTrack?.id,
         selectedCaption?.id
     ) {
+        val isNewVideo = loadedVideoId != video.videoId
+        loadedVideoId = video.videoId
+
+        val mediaMetadata = MediaMetadata.Builder()
+            .setTitle(video.title)
+            .setArtist(video.uploaderName)
+            .setDisplayTitle(video.title)
+            .setSubtitle(video.uploaderName)
+            .apply {
+                if (video.thumbnailUrl.isNotBlank()) {
+                    setArtworkUri(Uri.parse(video.thumbnailUrl))
+                }
+            }
+            .build()
+
         val activeAudioTrack = selectedAudioTrack
             ?: video.audioTracks.firstOrNull { it.isOriginal }
             ?: video.audioTracks.firstOrNull()
@@ -334,12 +407,14 @@ fun VideoPlayerScreen(
                 val videoSource = createAdaptiveOrProgressiveSource(
                     dataSourceFactory = dataSourceFactory,
                     streamUrl = selectedQuality.videoUrl,
-                    dashManifestXml = selectedQuality.dashManifestXml
+                    dashManifestXml = selectedQuality.dashManifestXml,
+                    mediaMetadata = mediaMetadata
                 )
                 val audioSource = createAdaptiveOrProgressiveSource(
                     dataSourceFactory = dataSourceFactory,
                     streamUrl = activeAudioUrl,
-                    dashManifestXml = activeAudioTrack?.dashManifestXml
+                    dashManifestXml = activeAudioTrack?.dashManifestXml,
+                    mediaMetadata = mediaMetadata
                 )
                 sourcesToMerge.add(videoSource)
                 sourcesToMerge.add(audioSource)
@@ -348,13 +423,18 @@ fun VideoPlayerScreen(
                 val videoSource = createAdaptiveOrProgressiveSource(
                     dataSourceFactory = dataSourceFactory,
                     streamUrl = selectedQuality.videoUrl,
-                    dashManifestXml = selectedQuality.dashManifestXml
+                    dashManifestXml = selectedQuality.dashManifestXml,
+                    mediaMetadata = mediaMetadata
                 )
                 sourcesToMerge.add(videoSource)
             }
             !video.hlsUrl.isNullOrEmpty() -> {
+                val hlsItem = MediaItem.Builder()
+                    .setUri(video.hlsUrl)
+                    .setMediaMetadata(mediaMetadata)
+                    .build()
                 val hlsSource = HlsMediaSource.Factory(dataSourceFactory)
-                    .createMediaSource(MediaItem.fromUri(video.hlsUrl))
+                    .createMediaSource(hlsItem)
                 sourcesToMerge.add(hlsSource)
             }
         }
@@ -388,7 +468,7 @@ fun VideoPlayerScreen(
                 .setPreferredTextLanguage(selectedCaption?.languageCode)
                 .build()
 
-            val resumePos = if (exoPlayer.currentPosition > 0L) {
+            val resumePos = if (!isNewVideo && exoPlayer.currentPosition > 0L) {
                 exoPlayer.currentPosition
             } else {
                 initialSeekPositionMs
@@ -400,19 +480,28 @@ fun VideoPlayerScreen(
             }
             exoPlayer.prepare()
             exoPlayer.playWhenReady = true
+            notificationManager.updateNotification()
         }
     }
 
-    // Apply playback speed updates
-    LaunchedEffect(playbackSpeed) {
-        exoPlayer.playbackParameters = PlaybackParameters(playbackSpeed)
+    // Apply single-video loop toggle (Repeat One vs Repeat Off)
+    LaunchedEffect(exoPlayer, isLoopEnabled) {
+        exoPlayer.repeatMode = if (isLoopEnabled) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+    }
+
+    // Apply playback speed updates (including temporary Long-Press 2x Speed boost)
+    val effectivePlaybackSpeed = if (isHold2xSpeedActive) 2.0f else playbackSpeed
+    LaunchedEffect(effectivePlaybackSpeed) {
+        exoPlayer.playbackParameters = PlaybackParameters(effectivePlaybackSpeed)
     }
 
     // Listen to ExoPlayer events
-    DisposableEffect(exoPlayer) {
+    DisposableEffect(exoPlayer, activePlaylist, activePlaylistIndex, isLoopEnabled) {
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
                 isPlaying = playing
+                onPlayerPlayingStateChanged(playing)
+                notificationManager.updateNotification()
                 val pos = exoPlayer.currentPosition.coerceAtLeast(0L)
                 currentPositionMs = pos
                 bufferedPositionMs = exoPlayer.bufferedPosition.coerceAtLeast(pos)
@@ -423,15 +512,45 @@ fun VideoPlayerScreen(
 
             override fun onPlaybackStateChanged(state: Int) {
                 playbackState = state
+                notificationManager.updateNotification()
                 if (exoPlayer.duration > 0) {
                     durationMs = exoPlayer.duration
+                }
+                if (state == Player.STATE_ENDED && !isLoopEnabled && activePlaylist != null) {
+                    if (activePlaylistIndex + 1 < activePlaylist.videos.size) {
+                        onPlayNextInPlaylist(0L)
+                    }
                 }
             }
         }
         exoPlayer.addListener(listener)
         onDispose {
             exoPlayer.removeListener(listener)
+        }
+    }
+
+    // Release ExoPlayer when VideoPlayerScreen leaves composition
+    DisposableEffect(exoPlayer) {
+        onDispose {
             exoPlayer.release()
+        }
+    }
+
+    // Closeable PiP handling:
+    // When user closes/dismisses the floating PiP window (X button or swipe down), PiP mode exits while
+    // the Activity lifecycle is NOT STARTED. If Background Play is OFF, pause playback immediately like YouTube!
+    var wasInPipMode by remember { mutableStateOf(false) }
+    LaunchedEffect(isInPipMode) {
+        if (isInPipMode) {
+            wasInPipMode = true
+        } else if (wasInPipMode) {
+            wasInPipMode = false
+            val isAppForeground = lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+            if (!isAppForeground && !backgroundPlayEnabled) {
+                exoPlayer.pause()
+                onProgressUpdate(exoPlayer.currentPosition)
+                notificationManager.updateNotification()
+            }
         }
     }
 
@@ -443,6 +562,7 @@ fun VideoPlayerScreen(
                 val inPipNow = isInPipMode || (activity?.isInPictureInPictureMode == true)
                 if (!inPipNow && !backgroundPlayEnabled) {
                     exoPlayer.pause()
+                    notificationManager.updateNotification()
                 }
             }
         }
@@ -485,7 +605,8 @@ fun VideoPlayerScreen(
 
     // Auto-hide controls after 3.5 seconds of playing
     val anySheetOpen = showSettingsSheet || showQualitySheet || showAudioSheet ||
-        showCaptionSheet || showSpeedSheet || showChaptersSheet
+        showCaptionSheet || showSpeedSheet || showChaptersSheet || showPlaylistSheet ||
+        showMathUnlockDialog || unlockHoldProgress > 0f
     LaunchedEffect(controlsVisible, isPlaying, isScrubbing, anySheetOpen) {
         if (controlsVisible && isPlaying && !isScrubbing && !anySheetOpen) {
             delay(3500L)
@@ -705,9 +826,23 @@ fun VideoPlayerScreen(
                         }
                     }
                 }
-                // Single-tap (toggle controls) & Double-tap (-10s / +10s seek)
-                .pointerInput(isControlsLocked) {
+                // Single-tap (toggle controls), Double-tap (-10s / +10s seek), & Long-press (2x Speed while held)
+                .pointerInput(isControlsLocked, isInPipMode) {
                     detectTapGestures(
+                        onPress = {
+                            try {
+                                tryAwaitRelease()
+                            } finally {
+                                if (isHold2xSpeedActive) {
+                                    isHold2xSpeedActive = false
+                                }
+                            }
+                        },
+                        onLongPress = {
+                            if (!isControlsLocked && !isInPipMode && exoPlayer.isPlaying) {
+                                isHold2xSpeedActive = true
+                            }
+                        },
                         onTap = {
                             controlsVisible = !controlsVisible
                         },
@@ -830,6 +965,39 @@ fun VideoPlayerScreen(
                 }
             }
 
+            // Long-Press 2x Speed Pill ("2x Speed" at top-center while finger is held down, just like YouTube)
+            androidx.compose.animation.AnimatedVisibility(
+                visible = isHold2xSpeedActive && !isInPipMode,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 24.dp)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(24.dp),
+                    color = Color.Black.copy(alpha = 0.82f)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.FastForward,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "2x Speed",
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+
             // Pinch-to-Zoom Feedback Pill ("Zoomed to fill" / "Original" at top-center, just like YouTube)
             androidx.compose.animation.AnimatedVisibility(
                 visible = zoomFeedbackText != null,
@@ -929,7 +1097,7 @@ fun VideoPlayerScreen(
                 )
             }
 
-            // Locked Screen Overlay (When user locks screen from YouTube Settings menu)
+            // Toddler-Proof Kids Locked Screen Overlay (Hold 2s, Parent Math Challenge, or Single Tap)
             if (isControlsLocked && !isInPipMode) {
                 androidx.compose.animation.AnimatedVisibility(
                     visible = controlsVisible,
@@ -939,30 +1107,99 @@ fun VideoPlayerScreen(
                         .align(Alignment.BottomCenter)
                         .padding(bottom = 28.dp)
                 ) {
-                    Surface(
-                        onClick = {
+                    val unlockHintText = when (kidsUnlockMode) {
+                        KidsUnlockMode.HOLD_2S -> if (unlockHoldProgress > 0f) {
+                            "Keep holding to unlock... ${(unlockHoldProgress * 100f).roundToInt()}%"
+                        } else {
+                            "Screen locked · Hold 2s to unlock"
+                        }
+                        KidsUnlockMode.MATH_CHALLENGE -> "Screen locked · Parent math unlock"
+                        KidsUnlockMode.SINGLE_TAP -> "Screen locked · Tap to unlock"
+                    }
+
+                    val pillModifier = when (kidsUnlockMode) {
+                        KidsUnlockMode.HOLD_2S -> Modifier.pointerInput(kidsUnlockMode) {
+                            coroutineScope {
+                                awaitEachGesture {
+                                    awaitFirstDown(requireUnconsumed = false)
+                                    controlsVisible = true
+                                    unlockHoldProgress = 0f
+                                    var unlocked = false
+                                    val holdJob = launch {
+                                        val steps = 40
+                                        for (step in 1..steps) {
+                                            delay(50L) // 40 * 50ms = 2000ms (2.0 seconds)
+                                            unlockHoldProgress = step.toFloat() / steps.toFloat()
+                                        }
+                                        unlocked = true
+                                        isControlsLocked = false
+                                        controlsVisible = true
+                                        unlockHoldProgress = 0f
+                                    }
+                                    do {
+                                        val event = awaitPointerEvent()
+                                    } while (event.changes.any { it.pressed } && !unlocked)
+                                    holdJob.cancel()
+                                    unlockHoldProgress = 0f
+                                }
+                            }
+                        }
+                        KidsUnlockMode.MATH_CHALLENGE -> Modifier.clickable {
+                            val a = Random.nextInt(3, 10)
+                            val b = Random.nextInt(4, 10)
+                            val answer = a * b
+                            val candidates = mutableSetOf(answer)
+                            while (candidates.size < 4) {
+                                val offset = listOf(-6, -4, -3, -2, 2, 3, 4, 6, 8).random()
+                                val wrong = (answer + offset).coerceAtLeast(6)
+                                if (wrong != answer) candidates.add(wrong)
+                            }
+                            mathFactorA = a
+                            mathFactorB = b
+                            mathOptions = candidates.shuffled()
+                            mathErrorText = null
+                            showMathUnlockDialog = true
+                        }
+                        KidsUnlockMode.SINGLE_TAP -> Modifier.clickable {
                             isControlsLocked = false
                             controlsVisible = true
-                        },
+                        }
+                    }
+
+                    Surface(
                         shape = RoundedCornerShape(24.dp),
-                        color = Color.Black.copy(alpha = 0.78f)
+                        color = Color.Black.copy(alpha = 0.82f),
+                        modifier = pillModifier
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Rounded.LockOpen,
-                                contentDescription = "Unlock screen",
-                                tint = Color.White,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Screen locked · Tap to unlock",
-                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                color = Color.White
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Rounded.LockOpen,
+                                    contentDescription = "Unlock screen",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = unlockHintText,
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                    color = Color.White
+                                )
+                            }
+                            if (kidsUnlockMode == KidsUnlockMode.HOLD_2S && unlockHoldProgress > 0f) {
+                                Spacer(modifier = Modifier.height(6.dp))
+                                LinearProgressIndicator(
+                                    progress = { unlockHoldProgress.coerceIn(0f, 1f) },
+                                    color = YouTubeRed,
+                                    trackColor = Color.White.copy(alpha = 0.25f),
+                                    modifier = Modifier
+                                        .width(180.dp)
+                                        .height(4.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -1427,6 +1664,20 @@ fun VideoPlayerScreen(
                                                 onClick = { showChaptersSheet = true }
                                             )
                                         }
+                                        if (activePlaylist != null && activePlaylist.videos.isNotEmpty()) {
+                                            FullscreenQuickPill(
+                                                icon = Icons.Rounded.PlaylistPlay,
+                                                label = "Playlist (${activePlaylistIndex + 1}/${activePlaylist.videos.size})",
+                                                isActive = true,
+                                                onClick = { showPlaylistSheet = true }
+                                            )
+                                        }
+                                        FullscreenQuickPill(
+                                            icon = if (isLoopEnabled) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
+                                            label = if (isLoopEnabled) "Loop: On" else "Loop",
+                                            isActive = isLoopEnabled,
+                                            onClick = { isLoopEnabled = !isLoopEnabled }
+                                        )
                                     }
 
                                     Spacer(modifier = Modifier.width(12.dp))
@@ -1494,6 +1745,9 @@ fun VideoPlayerScreen(
                             append("  ·  CC: ")
                             append(selectedCaption.languageCode.uppercase())
                         }
+                        if (isLoopEnabled) {
+                            append("  ·  Looping")
+                        }
                         if (backgroundPlayEnabled) {
                             append("  ·  Bg Play")
                         }
@@ -1504,6 +1758,73 @@ fun VideoPlayerScreen(
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
+
+                // Active Playlist Queue Banner (if watching a YouTube Playlist)
+                if (activePlaylist != null && activePlaylist.videos.isNotEmpty()) {
+                    Surface(
+                        onClick = { showPlaylistSheet = true },
+                        shape = RoundedCornerShape(14.dp),
+                        color = Color(0xFF212121),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.PlaylistPlay,
+                                contentDescription = null,
+                                tint = YouTubeRed,
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "${activePlaylist.title} (${activePlaylistIndex + 1}/${activePlaylist.videos.size})",
+                                    style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                                    color = Color.White,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                val nextVideoTitle = activePlaylist.videos
+                                    .getOrNull(activePlaylistIndex + 1)?.title
+                                    ?: "End of playlist"
+                                Text(
+                                    text = "Next: $nextVideoTitle",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.White.copy(alpha = 0.65f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            IconButton(
+                                onClick = { onPlayPreviousInPlaylist(exoPlayer.currentPosition) },
+                                enabled = activePlaylistIndex > 0,
+                                modifier = Modifier.size(34.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.SkipPrevious,
+                                    contentDescription = "Previous in playlist",
+                                    tint = if (activePlaylistIndex > 0) Color.White else Color.White.copy(alpha = 0.3f)
+                                )
+                            }
+                            IconButton(
+                                onClick = { onPlayNextInPlaylist(exoPlayer.currentPosition) },
+                                enabled = activePlaylistIndex + 1 < activePlaylist.videos.size,
+                                modifier = Modifier.size(34.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.SkipNext,
+                                    contentDescription = "Next in playlist",
+                                    tint = if (activePlaylistIndex + 1 < activePlaylist.videos.size) Color.White else Color.White.copy(alpha = 0.3f)
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(14.dp))
+                }
 
                 // YouTube Channel Row
                 Row(
@@ -1570,7 +1891,7 @@ fun VideoPlayerScreen(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // YouTube-style Horizontal Action Pills Row (Quality, Audio, Captions, Chapters, Speed, Bg Play, PiP, Fullscreen, Share, Copy)
+                // YouTube-style Horizontal Action Pills Row (Quality, Audio, Captions, Chapters, Playlist, Loop, Speed, Bg Play, PiP, Fullscreen, Share, Copy)
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1616,6 +1937,22 @@ fun VideoPlayerScreen(
                             onClick = { showChaptersSheet = true }
                         )
                     }
+
+                    if (activePlaylist != null && activePlaylist.videos.isNotEmpty()) {
+                        YouTubeActionChip(
+                            icon = Icons.Rounded.PlaylistPlay,
+                            label = "Playlist (${activePlaylistIndex + 1}/${activePlaylist.videos.size})",
+                            isHighlighted = true,
+                            onClick = { showPlaylistSheet = true }
+                        )
+                    }
+
+                    YouTubeActionChip(
+                        icon = if (isLoopEnabled) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
+                        label = if (isLoopEnabled) "Loop: On" else "Loop",
+                        isHighlighted = isLoopEnabled,
+                        onClick = { isLoopEnabled = !isLoopEnabled }
+                    )
 
                     YouTubeActionChip(
                         icon = Icons.Rounded.Speed,
@@ -1854,12 +2191,62 @@ fun VideoPlayerScreen(
                     )
                 }
 
+                // 5b. Playlist Queue (if watching a playlist)
+                if (activePlaylist != null && activePlaylist.videos.isNotEmpty()) {
+                    YouTubeSettingsRow(
+                        icon = Icons.Rounded.PlaylistPlay,
+                        title = "Playlist queue",
+                        valueText = "${activePlaylistIndex + 1} / ${activePlaylist.videos.size}",
+                        onClick = {
+                            showSettingsSheet = false
+                            showPlaylistSheet = true
+                        }
+                    )
+                }
+
                 HorizontalDivider(
                     color = Color.White.copy(alpha = 0.1f),
                     modifier = Modifier.padding(vertical = 4.dp)
                 )
 
-                // 6. Background audio play toggle
+                // 6. Loop video (Single-video Repeat toggle)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            isLoopEnabled = !isLoopEnabled
+                        }
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (isLoopEnabled) Icons.Rounded.RepeatOne else Icons.Rounded.Repeat,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Loop video",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = Color.White
+                        )
+                        Text(
+                            text = if (isLoopEnabled) "Repeating current video continuously" else "Off (Play once)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.65f)
+                        )
+                    }
+                    Switch(
+                        checked = isLoopEnabled,
+                        onCheckedChange = { checked ->
+                            isLoopEnabled = checked
+                        }
+                    )
+                }
+
+                // 7. Background audio play toggle
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -2258,6 +2645,206 @@ fun VideoPlayerScreen(
             }
         }
     }
+
+    // 5. Playlist Queue Bottom Sheet
+    if (showPlaylistSheet && activePlaylist != null && activePlaylist.videos.isNotEmpty()) {
+        ModalBottomSheet(
+            onDismissRequest = { showPlaylistSheet = false }
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 460.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 24.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = activePlaylist.title,
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = "${activePlaylist.uploaderName}  •  ${activePlaylistIndex + 1} / ${activePlaylist.videos.size} videos",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+
+                activePlaylist.videos.forEachIndexed { index, item ->
+                    val isCurrent = index == activePlaylistIndex
+                    ListItem(
+                        leadingContent = {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = "${index + 1}",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal
+                                    ),
+                                    color = if (isCurrent) YouTubeRed else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.width(24.dp)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .width(88.dp)
+                                        .height(50.dp)
+                                        .background(Color.Black, RoundedCornerShape(8.dp))
+                                ) {
+                                    AsyncImage(
+                                        model = item.thumbnailUrl,
+                                        contentDescription = item.title,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                    if (item.durationSeconds > 0L) {
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = Color.Black.copy(alpha = 0.8f),
+                                            modifier = Modifier
+                                                .align(Alignment.BottomEnd)
+                                                .padding(3.dp)
+                                        ) {
+                                            Text(
+                                                text = formatDurationSeconds(item.durationSeconds),
+                                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 10.sp),
+                                                color = Color.White,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        headlineContent = {
+                            Text(
+                                text = item.title,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium
+                                ),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        },
+                        supportingContent = {
+                            Text(
+                                text = item.uploaderName,
+                                style = MaterialTheme.typography.labelSmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        },
+                        trailingContent = {
+                            if (isCurrent) {
+                                Icon(
+                                    imageVector = Icons.Rounded.Check,
+                                    contentDescription = "Now playing",
+                                    tint = YouTubeRed
+                                )
+                            }
+                        },
+                        modifier = Modifier.clickable {
+                            showPlaylistSheet = false
+                            if (!isCurrent) {
+                                onSelectPlaylistVideo(index, exoPlayer.currentPosition)
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    // 6. Parent Math Challenge Unlock Dialog (Toddler-Proof Screen Unlock)
+    if (showMathUnlockDialog) {
+        val correctAnswer = mathFactorA * mathFactorB
+        AlertDialog(
+            onDismissRequest = { showMathUnlockDialog = false },
+            icon = {
+                Icon(
+                    imageVector = Icons.Rounded.LockOpen,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            },
+            title = {
+                Text(
+                    text = "Parent Unlock Gate",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Solve this quick multiplication to unlock the player controls:",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "$mathFactorA × $mathFactorB = ?",
+                            style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.ExtraBold),
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier
+                                .padding(vertical = 16.dp, horizontal = 20.dp)
+                                .align(Alignment.CenterHorizontally)
+                        )
+                    }
+                    if (mathErrorText != null) {
+                        Text(
+                            text = mathErrorText.orEmpty(),
+                            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        mathOptions.forEach { option ->
+                            OutlinedButton(
+                                onClick = {
+                                    if (option == correctAnswer) {
+                                        showMathUnlockDialog = false
+                                        isControlsLocked = false
+                                        controlsVisible = true
+                                    } else {
+                                        mathErrorText = "Not quite — try again!"
+                                    }
+                                },
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text(
+                                    text = option.toString(),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showMathUnlockDialog = false }) {
+                    Text("Keep Locked")
+                }
+            }
+        )
+    }
 }
 
 @kotlin.OptIn(ExperimentalMaterial3Api::class)
@@ -2460,21 +3047,26 @@ private fun YouTubeSettingsRow(
 private fun createAdaptiveOrProgressiveSource(
     dataSourceFactory: DataSource.Factory,
     streamUrl: String,
-    dashManifestXml: String?
+    dashManifestXml: String?,
+    mediaMetadata: MediaMetadata
 ): MediaSource {
+    val mediaItem = MediaItem.Builder()
+        .setUri(streamUrl)
+        .setMediaMetadata(mediaMetadata)
+        .build()
     if (!dashManifestXml.isNullOrBlank()) {
         val dashSource = runCatching {
             val manifest = ByteArrayInputStream(dashManifestXml.toByteArray(Charsets.UTF_8)).use { input ->
                 DashManifestParser().parse(Uri.parse(streamUrl), input)
             }
-            DashMediaSource.Factory(dataSourceFactory).createMediaSource(manifest)
+            DashMediaSource.Factory(dataSourceFactory).createMediaSource(manifest, mediaItem)
         }.getOrNull()
         if (dashSource != null) {
             return dashSource
         }
     }
     return ProgressiveMediaSource.Factory(dataSourceFactory)
-        .createMediaSource(MediaItem.fromUri(streamUrl))
+        .createMediaSource(mediaItem)
 }
 
 private fun formatCompactCount(count: Long): String {
