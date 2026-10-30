@@ -169,3 +169,18 @@ This document tracks everything built, configured, and improved in the **PureTub
 3. **F-Droid Compliance & Redesigned README ([`README.md`](file:///f:/Youtube%20Video%20watching%20app/README.md), [`LICENSE`](file:///f:/Youtube%20Video%20watching%20app/LICENSE), [`fastlane/`](file:///f:/Youtube%20Video%20watching%20app/fastlane/metadata/android/en-US/full_description.txt), [`app/build.gradle.kts`](file:///f:/Youtube%20Video%20watching%20app/app/build.gradle.kts)):**
    - Disabled Google's proprietary dependency metadata block (`dependenciesInfo { includeInApk = false; includeInBundle = false }`), added an `MIT` [`LICENSE`](file:///f:/Youtube%20Video%20watching%20app/LICENSE), and added Fastlane metadata for F-Droid / IzzyOnDroid submission.
    - Bumped version to **`v0.3.007`** (`versionCode = 10`, `versionName = "0.3.007"`).
+
+
+---
+
+## v0.3.008 — Production Release APK Builds (`PureTube-vX.X.XXX.apk`), Rich GitHub Release Notes, Official SVG Logo & Creator Profile
+
+1. **Switched Permanently to Production Release APK Builds ([`app/build.gradle.kts`](file:///f:/Youtube%20Video%20watching%20app/app/build.gradle.kts), [`.build-tools/build-apk.bat`](file:///f:/Youtube%20Video%20watching%20app/.build-tools/build-apk.bat), [`.github/workflows/build-apk.yml`](file:///f:/Youtube%20Video%20watching%20app/.github/workflows/build-apk.yml)):**
+   - Replaced `assembleDebug` (`-debug.apk`) with `assembleRelease` across local and GitHub Actions pipelines, outputting clean `PureTube-v0.3.008.apk` and `PureTube.apk` (~15.5 MB, down from ~24 MB) signed with the persistent project keystore.
+
+2. **Automated Detailed Release Notes & Clean Asset Publishing ([`.github/workflows/build-apk.yml`](file:///f:/Youtube%20Video%20watching%20app/.github/workflows/build-apk.yml)):**
+   - Automatically extracts the active version's changelog section from `PROJECT_LOG.md` along with full PureTube feature highlights and publishes them directly onto the GitHub Release page.
+
+3. **Official PureTube Red Shield SVG Logo & Creator Details ([`assets/logo.svg`](file:///f:/Youtube%20Video%20watching%20app/assets/logo.svg), [`README.md`](file:///f:/Youtube%20Video%20watching%20app/README.md), [`SettingsScreen.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/screens/SettingsScreen.kt)):**
+   - Added standalone `assets/logo.svg` (Red Shield + White Play Symbol) rendered at the top of `README.md` and inside GitHub Releases.
+   - Added **Joyal Siby** creator section & portfolio links (`joyalsiby.com` and `github.com/joyalsiby`) to both `README.md` and the in-app **Settings -> About & Developer** section.

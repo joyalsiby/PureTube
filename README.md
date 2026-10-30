@@ -1,21 +1,24 @@
 <div align="center">
 
-<img src="app/src/main/res/drawable/ic_launcher_legacy.xml" width="0" height="0" />
+<a href="https://github.com/joyalsiby/PureTube">
+  <img src="assets/logo.svg" width="96" height="96" alt="PureTube Shield Logo" />
+</a>
 
-# 🛡️ PureTube
+# <img src="assets/logo.svg" width="34" height="34" align="top" alt="PureTube" /> PureTube
 ### **The Distraction-Free, 100% Ad-Free YouTube Player for Kids, Parents & Deep Focus**
 
 *Keep the official YouTube app locked. Share or paste only the exact video link you want your child—or yourself—to watch in a clean Material You (MUI3) interface with **Zero Ads**, **No Search**, **No Shorts**, and **No Algorithmic Rabbit Holes**.*
 
 [![Latest Release](https://img.shields.io/github/v/release/joyalsiby/PureTube?style=for-the-badge&logo=github&color=E50914&label=Latest%20Release)](https://github.com/joyalsiby/PureTube/releases/latest)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/joyalsiby/PureTube/build-apk.yml?style=for-the-badge&logo=githubactions&label=APK%20Build)](https://github.com/joyalsiby/PureTube/actions)
-[![Android](https://img.shields.io/badge/Android-7.0%2B%20(API%2024%2B)-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/joyalsiby/PureTube/releases)
+[![Android](https://img.shields.io/badge/Android-7.0%2B%20(API%2024%2B)-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/joyalsiby/PureTube/releases/latest)
 [![UI](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?style=for-the-badge&logo=jetpackcompose&logoColor=white)](https://developer.android.com/jetpack/compose)
+[![Author](https://img.shields.io/badge/By-Joyal%20Siby-111111?style=for-the-badge&logo=vercel&logoColor=white)](https://joyalsiby.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-F59E0B?style=for-the-badge)](LICENSE)
 
 <br />
 
-[**⬇️ Download Latest APK (`v0.3.007`)**](https://github.com/joyalsiby/PureTube/releases/latest) · [**📦 Install via Obtainium / F-Droid**](#-f-droid--obtainium-installation) · [**🛡️ Bypass Play Protect Warning**](#-fixing-the-google-play-protect-scan-warning) · [**📝 Changelog**](PROJECT_LOG.md)
+[**⬇️ Download Latest APK (`v0.3.008`)**](https://github.com/joyalsiby/PureTube/releases/latest) · [**📦 Install via Obtainium / F-Droid**](#-f-droid--obtainium-installation) · [**🛡️ Bypass Play Protect Warning**](#-fixing-the-google-play-protect-scan-warning) · [**🌐 joyalsiby.com**](https://joyalsiby.com) · [**📝 Changelog**](PROJECT_LOG.md)
 
 </div>
 
@@ -30,7 +33,7 @@ When you hand a phone or tablet to a child—or open YouTube yourself to watch a
 2. **📲 Share or Paste 1 Link:** Simply tap **`Share -> PureTube`** from a parent's link, WhatsApp, or browser—or paste the link directly into PureTube's single rounded Material 3 input bar.
 3. **🎯 Watch That Video—Nothing Else:** PureTube plays **only** that video with **100% zero ads**, **no search bar**, **no home feed**, **no comments**, and **no recommended video sidebar**. When the video finishes, it stops.
 
-| Feature | Official YouTube / YouTube Kids | 🛡️ **PureTube** |
+| Feature | Official YouTube / YouTube Kids | <img src="assets/logo.svg" width="18" height="18" align="top" /> **PureTube** |
 | :--- | :---: | :---: |
 | **Pre-roll / Mid-roll Video Ads** | ❌ Frequent ads & sponsored cards | ✅ **100% Ad-Free** |
 | **Algorithmic Home Feed & Shorts** | ❌ Endless scrolling rabbit holes | ✅ **None — Link-Only Focus** |
@@ -82,7 +85,7 @@ When you hand a phone or tablet to a child—or open YouTube yourself to watch a
    - **Playback & Quality:** Default startup resolution (`4K` / `1440p` / `1080p` / `720p` / `480p` / `360p`), default playback speed, Background Play toggle, and Auto-PiP toggle.
    - **Appearance:** System / Dark / Light theme selector + Material You Dynamic Color toggle.
    - **Privacy & History:** Pause/enable watch history saving & clear history.
-   - **About & Links:** Direct links to GitHub Repository, Releases & Changelog, Issue Tracker, and Share PureTube.
+   - **About & Developer:** Direct links to [Joyal Siby's Portfolio (`joyalsiby.com`)](https://joyalsiby.com), [GitHub Profile (`@joyalsiby`)](https://github.com/joyalsiby), Repository, Releases, and Issue Tracker.
 
 ---
 
@@ -90,49 +93,28 @@ When you hand a phone or tablet to a child—or open YouTube yourself to watch a
 
 Because apps that extract ad-free YouTube streams cannot be hosted on the Google Play Store (due to Google's terms regarding YouTube ad-blocking and background play), Android's **Google Play Protect** may show an *"App scan recommended"* or *"Unrecognized app developer"* prompt when installing for the first time.
 
-### Why Does This Warning Appear?
-1. **New Self-Signed Certificate Reputation:** Google Play Protect tracks the SHA-256 signing certificate of every APK across Android devices. Until an open-source certificate has been installed by hundreds of devices cleanly, Play Protect prompts the user to "Scan app".
-2. **`CN=Android Debug` Certificate Subject:** APKs signed with a standard debug-style certificate (`CN=Android Debug`) or debuggable flag are flagged more aggressively by Play Protect heuristics than production release APKs.
-
 ### ✅ How PureTube Minimizes & Bypasses It
+- **Production Release Builds (`assembleRelease`):** PureTube builds clean, non-debuggable release APKs (`PureTube-vX.X.XXX.apk`) with `dependenciesInfo` disabled, avoiding debug-build heuristics.
 - **Persistent Keystore Across All Releases:** Every build of PureTube (local and GitHub Actions) is signed with the exact same [`app/keystore/puretube.keystore`](app/keystore/puretube.keystore) (`SHA-256: 02:BC:9E:CC:A9:05:89:34:C5:1D:FE:EC:F6:52:97:68:49:3D:C9:B4:85:69:3C:38:AA:33:85:92:E7:5A:68:41`).
-- **Once Scanned, Updates Never Warn Again:** When installing PureTube for the first time:
-  1. If Play Protect asks **"Scan app before installing?"**, tap **"Scan app"**. Because PureTube uses zero obfuscation, zero trackers, and clean AndroidX/NewPipe open-source code, the scan passes as **Safe** in ~2 seconds.
-  2. Or tap **"More details" -> "Install anyway"**.
-  3. **All future updates installed via PureTube's built-in Updater will install seamlessly without repeating the warning** because the signing key matches the already-trusted app on your phone!
-- **Developer Tip — Appeal to Google Play Protect (Optional):** You can submit your release APK directly to Google's [Play Protect Appeals Form](https://support.google.com/googleplay/android-developer/contact/protectappeals) so Google whitelists your signing certificate's SHA-256 fingerprint globally across all Android devices.
+- **Once Scanned, Updates Never Warn Again:**
+  1. On first install, if Play Protect asks **"Scan app before installing?"**, tap **"Scan app"** (passes as **Safe** in ~2 seconds) or **"More details" -> "Install anyway"**.
+  2. **All future updates installed via PureTube's built-in Updater install seamlessly without repeating the warning** because Android already trusts the signing key on your device.
+- **Developer Appeal (Global Whitelist):** Submit the release APK to Google's [Play Protect Appeals Form](https://support.google.com/googleplay/android-developer/contact/protectappeals) to whitelist the signing certificate's SHA-256 fingerprint globally.
 
 ---
 
 ## 📦 F-Droid & Obtainium Installation
 
-Since ad-free YouTube players cannot be published on the Google Play Store, here are the best ways to distribute and auto-update PureTube on Android:
+### Option A: Instant F-Droid Experience via **Obtainium**
+[**Obtainium**](https://github.com/ImranR98/Obtainium) lets anyone track and auto-update PureTube directly from GitHub Releases:
+1. Install **Obtainium** -> Tap **"Add App"** -> Paste `https://github.com/joyalsiby/PureTube`.
+2. Obtainium will automatically track new releases and update PureTube. *(Or use PureTube's built-in **Settings -> Check for Updates** button!)*
 
-### Option A: Instant F-Droid Experience via **Obtainium** (No Waiting!)
-[**Obtainium**](https://github.com/ImranR98/Obtainium) lets anyone track and auto-update PureTube directly from GitHub Releases (just like an F-Droid store client):
-1. Install **Obtainium** from F-Droid or GitHub.
-2. Tap **"Add App"** -> Paste:
-   ```text
-   https://github.com/joyalsiby/PureTube
-   ```
-3. Obtainium will automatically track new releases and update PureTube in the background. *(Or just use PureTube's built-in **Settings -> Check for Updates** button!)*
-
-### Option B: Publishing to **F-Droid** & **IzzyOnDroid**
-PureTube is already configured to be **100% F-Droid compliant**:
-- ✅ **100% Free & Open Source Dependencies** (Kotlin, Jetpack Compose, AndroidX Media3, Room, NewPipeExtractor, OkHttp, Coil — no proprietary Google Play Services or Firebase SDKs).
-- ✅ **Google Dependency Metadata Blob Disabled:** `dependenciesInfo { includeInApk = false; includeInBundle = false }` is configured in [`app/build.gradle.kts`](app/build.gradle.kts) (required by F-Droid's scanner).
-- ✅ **Fastlane Metadata Included:** Title, short description, and full description are ready in [`fastlane/metadata/android/en-US/`](fastlane/metadata/android/en-US/).
-- ✅ **MIT License Included:** [`LICENSE`](LICENSE) is in the repository root.
-
-#### Steps to Get Listed on **IzzyOnDroid** (Fastest F-Droid Repo — Takes 1–2 Days)
-1. Push a tagged release on GitHub (`git tag v0.3.007 && git push origin v0.3.007`) so the APK is attached to your GitHub Release.
-2. Open a new issue at [**gitlab.com/IzzyOnDroid/repo/-/issues**](https://gitlab.com/IzzyOnDroid/repo/-/issues) with your repo URL (`https://github.com/joyalsiby/PureTube`).
-3. Once added, anyone with the **F-Droid**, **Droid-ify**, or **Neo Store** app (with the IzzyOnDroid repository enabled) can search for and install **PureTube**!
-
-#### Steps to Get Listed on the **Official F-Droid Repository**
-1. Fork [`gitlab.com/fdroid/rfp`](https://gitlab.com/fdroid/rfp) (Request for Packaging) or [`gitlab.com/fdroid/fdroiddata`](https://gitlab.com/fdroid/fdroiddata).
-2. Submit an RFP issue with `https://github.com/joyalsiby/PureTube`, Category: `Multimedia`, License: `MIT`.
-3. F-Droid's build servers will compile `PureTube` from source from your `v*` Git tags and publish it to the main F-Droid catalog.
+### Option B: **F-Droid** & **IzzyOnDroid** Ready
+PureTube is 100% F-Droid compliant:
+- ✅ **100% FOSS Dependencies** (Kotlin, Jetpack Compose, AndroidX Media3, Room, NewPipeExtractor, OkHttp, Coil).
+- ✅ **Google Dependency Metadata Blob Disabled:** `dependenciesInfo { includeInApk = false; includeInBundle = false }` in [`app/build.gradle.kts`](app/build.gradle.kts).
+- ✅ **Fastlane Metadata & MIT License Included:** Ready in [`fastlane/metadata/android/en-US/`](fastlane/metadata/android/en-US/) and [`LICENSE`](LICENSE).
 
 ---
 
@@ -151,20 +133,27 @@ PureTube is already configured to be **100% F-Droid compliant**:
 
 ## 🚀 Building Locally & Releasing
 
-### 1. Build APK Locally (Windows)
 ```cmd
 .build-tools\build-apk.bat
 ```
-Outputs [`PureTube-v0.3.007.apk`](PureTube-v0.3.007.apk) and [`PureTube.apk`](PureTube.apk) in the project root.
+Outputs [`PureTube-v0.3.008.apk`](PureTube-v0.3.008.apk) and [`PureTube.apk`](PureTube.apk) in the project root. Pushing any `v*` tag triggers [`.github/workflows/build-apk.yml`](.github/workflows/build-apk.yml) to automatically compile the release APK, extract the version changelog from [`PROJECT_LOG.md`](PROJECT_LOG.md), and publish a rich GitHub Release.
 
-### 2. Automated GitHub Actions Release
-Whenever you push a version tag starting with `v`, [`.github/workflows/build-apk.yml`](.github/workflows/build-apk.yml) automatically builds the APK and publishes a **GitHub Release** (which immediately notifies users via PureTube's in-app updater):
-```powershell
-git tag v0.3.007
-git push origin v0.3.007
-```
+---
+
+## 👨‍💻 Author & Creator
+
+<div align="center">
+
+### **Joyal Siby**
+*Product Designer, UI/UX Specialist & Creative Developer*  
+*“I create experiences — not just pixels.”*
+
+[![Website](https://img.shields.io/badge/Website-joyalsiby.com-FF0000?style=for-the-badge&logo=googlechrome&logoColor=white)](https://joyalsiby.com)
+[![GitHub](https://img.shields.io/badge/GitHub-@joyalsiby-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/joyalsiby)
+
+</div>
 
 ---
 
 ## 📄 License
-Licensed under the [MIT License](LICENSE). Built with ❤️ for distraction-free viewing.
+Licensed under the [MIT License](LICENSE). Designed & built with ❤️ by [Joyal Siby](https://joyalsiby.com).

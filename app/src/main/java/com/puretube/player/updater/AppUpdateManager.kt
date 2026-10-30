@@ -33,6 +33,9 @@ object AppUpdateManager {
     const val GITHUB_REPO_URL = "https://github.com/$GITHUB_OWNER/$GITHUB_REPO"
     const val GITHUB_RELEASES_URL = "$GITHUB_REPO_URL/releases"
     const val GITHUB_ISSUES_URL = "$GITHUB_REPO_URL/issues"
+    const val AUTHOR_NAME = "Joyal Siby"
+    const val AUTHOR_WEBSITE_URL = "https://joyalsiby.com"
+    const val AUTHOR_GITHUB_URL = "https://github.com/joyalsiby"
 
     private const val LATEST_RELEASE_API =
         "https://api.github.com/repos/$GITHUB_OWNER/$GITHUB_REPO/releases/latest"

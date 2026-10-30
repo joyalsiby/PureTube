@@ -19,16 +19,60 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Extract App Version from build.gradle.kts
+      - name: Extract App Version & Generate Release Notes from PROJECT_LOG.md
         id: version
         run: |
           VERSION_NAME=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
           VERSION_CODE=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' app/build.gradle.kts)
+          APK_NAME="PureTube-v${VERSION_NAME}.apk"
+
           echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
           echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
-          echo "apk_name=PureTube-v${VERSION_NAME}.apk" >> $GITHUB_OUTPUT
-          echo "Detected PureTube v${VERSION_NAME} (versionCode ${VERSION_CODE})"
+          echo "apk_name=$APK_NAME" >> $GITHUB_OUTPUT
+
+          # Extract section for current version from PROJECT_LOG.md
+          VERSION_LOG=$(awk "/^## .*v${VERSION_NAME}/{flag=1; next} /^## /{flag=0} /^---/{flag=0} flag" PROJECT_LOG.md)
+
+          cat << 'EOF' > release_notes.md
+          <div align="center">
+            <img src="https://raw.githubusercontent.com/${{ github.repository }}/main/assets/logo.svg" width="76" height="76" alt="PureTube Logo" />
+            <h2>PureTube <code>v${VERSION_NAME}</code></h2>
+            <p><b>Distraction-Free, 100% Ad-Free Material 3 YouTube Player for Kids, Parents & Focus</b></p>
+          </div>
+
+          ---
+          EOF
+
+          sed -i "s/\${VERSION_NAME}/${VERSION_NAME}/g" release_notes.md
+
+          echo "### 📦 Direct APK Download" >> release_notes.md
+          echo "- ⬇️ **[Download \`${APK_NAME}\`](https://github.com/${{ github.repository }}/releases/download/v${VERSION_NAME}/${APK_NAME})** (\`versionCode = ${VERSION_CODE}\`)" >> release_notes.md
+          echo "- 🔄 **In-Place Upgrade Ready:** Signed with PureTube's persistent release keystore—install directly over your current app (or use **Settings → Check for Updates** inside the app) without losing watch history or settings." >> release_notes.md
+          echo "" >> release_notes.md
+
+          if [ -n "$VERSION_LOG" ]; then
+            echo "### ✨ What's New in \`v${VERSION_NAME}\`" >> release_notes.md
+            echo "$VERSION_LOG" >> release_notes.md
+            echo "" >> release_notes.md
+          fi
+
+          cat << 'EOF' >> release_notes.md
+          ---
+
+          ### 🌟 Complete PureTube Feature Highlights
+          - 🧒 **Kids & Focus Mode (Parental Controls):** Keep the official YouTube app locked and share/paste only the video link you want your kids to watch—with **Zero Ads**, **No Search Bar**, **No Shorts Feed**, and **No Algorithmic Recommendations**. Includes **Auto Kids Screen Lock** on startup, **Auto-Fullscreen**, and **Hide Description/Stats** toggles.
+          - 🎬 **Authentic Material 3 YouTube Player UI:** Up to **4K / 1080p60** adaptive DASH playback, **Multi-Audio Track Switcher** (defaults to `Original` audio), **Closed Captions (`CC`)**, **Video Chapters** on the red seekbar, and **Clickable Timestamps** in the description.
+          - 👆 **Fullscreen Touch Gestures:** Left vertical swipe for **Brightness (`0%–100%`)**, right vertical swipe for **Volume (`0%–100%`)**, two-finger **Pinch-to-Zoom (`Zoomed to fill` / `Original`)**, and double-tap `±10s` seek.
+          - 🎧 **Background Play & Picture-in-Picture (PiP):** Keep audio playing with the screen off or float the video in a 16:9 PiP window when pressing Home.
+          - ⚡ **Zero-Stall Startup & Cool Battery Performance:** Parallel RAM stream preloader (`640 KB` video + `192 KB` audio), anti-throttling HTTP/2 range client, hardware `AVC1 (H.264)` priority, and zero Compose recompositions when controls are hidden.
+          - 🔄 **Built-In In-App Updater:** Automatically notifies when a new version is released on GitHub and downloads + installs the update in 1 tap.
+
+          ---
+          **Designed & Built by [Joyal Siby](https://joyalsiby.com)** · [GitHub (@joyalsiby)](https://github.com/joyalsiby) · [Full Project Log](https://github.com/${{ github.repository }}/blob/main/PROJECT_LOG.md)
+          EOF
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
@@ -57,16 +101,24 @@ jobs:
           name: PureTube-v${{ steps.version.outputs.version_name }}
           path: ${{ steps.version.outputs.apk_name }}
 
-      - name: Create GitHub Release (on v* tag push)
+      - name: Create or Update GitHub Release (on v* tag push)
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          name: "PureTube v${{ steps.version.outputs.version_name }}"
-          body: |
-            ### PureTube `v${{ steps.version.outputs.version_name }}` (`versionCode = ${{ steps.version.outputs.version_code }}`)
-            - **Direct APK Download:** Attach & install `${{ steps.version.outputs.apk_name }}` below.
-            - **In-Place Upgrade Ready:** Signed with the project's persistent keystore so you can install directly over previous versions (or update via the in-app Updater) without losing watch history.
-            - See [`PROJECT_LOG.md`](https://github.com/${{ github.repository }}/blob/main/PROJECT_LOG.md) for full changelog details.
-          files: |
-            ${{ steps.version.outputs.apk_name }}
-          generate_release_notes: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="${GITHUB_REF#refs/tags/}"
+          APK_FILE="${{ steps.version.outputs.apk_name }}"
+          TITLE="PureTube v${{ steps.version.outputs.version_name }}"
+
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Updating existing release $TAG_NAME..."
+            gh release edit "$TAG_NAME" --title "$TITLE" --notes-file release_notes.md
+            # Delete any leftover -debug.apk assets if present
+            for old_asset in $(gh release view "$TAG_NAME" --json assets -q '.assets[].name' | grep -E '\-debug\.apk$' || true); do
+              gh release delete-asset "$TAG_NAME" "$old_asset" --yes || true
+            done
+            gh release upload "$TAG_NAME" "$APK_FILE" --clobber
+          else
+            echo "Creating new release $TAG_NAME..."
+            gh release create "$TAG_NAME" "$APK_FILE" --title "$TITLE" --notes-file release_notes.md --generate-notes
+          fi

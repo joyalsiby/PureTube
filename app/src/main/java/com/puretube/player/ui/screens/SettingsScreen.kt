@@ -34,10 +34,12 @@ import androidx.compose.material.icons.rounded.Headphones
 import androidx.compose.material.icons.rounded.HighQuality
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Lock
 import androidx.compose.material.icons.rounded.NewReleases
 import androidx.compose.material.icons.rounded.OpenInBrowser
 import androidx.compose.material.icons.rounded.Palette
+import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Speed
@@ -501,7 +503,31 @@ fun SettingsScreen(
 
             // 7. ABOUT & LINKS
             item {
-                SettingsSectionCard(title = "About & Links") {
+                SettingsSectionCard(title = "About & Developer") {
+                    SettingsActionItem(
+                        icon = Icons.Rounded.Person,
+                        title = "Designed & Built by Joyal Siby",
+                        subtitle = "Product Designer & Creative Developer · github.com/joyalsiby",
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(AppUpdateManager.AUTHOR_GITHUB_URL))
+                            context.startActivity(intent)
+                        }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    SettingsActionItem(
+                        icon = Icons.Rounded.Language,
+                        title = "Developer Website & Portfolio",
+                        subtitle = "joyalsiby.com",
+                        onClick = {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(AppUpdateManager.AUTHOR_WEBSITE_URL))
+                            context.startActivity(intent)
+                        }
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
                     SettingsActionItem(
                         icon = Icons.Rounded.Code,
                         title = "GitHub Repository",
