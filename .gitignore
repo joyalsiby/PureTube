@@ -1,0 +1,46 @@
+# =============================================================================
+# PureTube — Android / Gradle / IDE .gitignore
+# =============================================================================
+
+# Gradle & Local Build Caches
+.gradle/
+build/
+**/build/
+.kotlin/
+.build-tools/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Local Environment & SDK Paths (Machine-specific)
+local.properties
+
+# Compiled Android Binaries (Uploaded via GitHub Releases / CI Artifacts instead of Git history)
+*.apk
+*.aab
+*.ap_
+*.aab.idsig
+*.apk.idsig
+*.dex
+*.class
+
+# Android Studio / IntelliJ IDEA / VS Code
+*.iml
+.idea/
+.vscode/
+*.ipr
+*.iws
+captures/
+.navigation/
+output-metadata.json
+
+# Native Build / Profiling / Crash Logs
+.externalNativeBuild/
+.cxx/
+*.hprof
+*.log
+hs_err_pid*
+replay_pid*
+
+# OS-Generated Files (Windows / macOS / Linux)
+.DS_Store
+Thumbs.db
+Desktop.ini

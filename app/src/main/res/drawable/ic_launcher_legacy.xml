@@ -1,0 +1,13 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Legacy self-contained icon: Minimal YouTube Red Shield + White Play Symbol -->
+    <path
+        android:fillColor="#FF0000"
+        android:pathData="M54,12L84,22.5C87.6,23.8 90,27.2 90,31V50.5C90,71.8 74.6,88.6 54,96C33.4,88.6 18,71.8 18,50.5V31C18,27.2 20.4,23.8 24,22.5L54,12Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M44,38C44,36 46.2,34.8 47.9,35.8L68.5,48.3C70.1,49.3 70.1,51.7 68.5,52.7L47.9,65.2C46.2,66.2 44,65 44,63V38Z" />
+</vector>

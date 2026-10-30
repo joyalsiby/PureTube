@@ -1,0 +1,15 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Minimal YouTube Red (#FF0000) Shield -->
+    <path
+        android:fillColor="#FF0000"
+        android:pathData="M54,22L77,30C79.8,31 81.5,33.6 81.5,36.6V51.5C81.5,67.8 69.8,80.6 54,86C38.2,80.6 26.5,67.8 26.5,51.5V36.6C26.5,33.6 28.2,31 31,30L54,22Z" />
+
+    <!-- Crisp White (#FFFFFF) Play Symbol Centered Inside the Shield -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M46,41.5C46,39.9 47.7,39 49.1,39.8L65.6,49.8C66.9,50.6 66.9,52.4 65.6,53.2L49.1,63.2C47.7,64 46,63.1 46,61.5V41.5Z" />
+</vector>
