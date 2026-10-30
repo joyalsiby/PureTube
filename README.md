@@ -155,7 +155,7 @@ PureTube is already configured to be **100% F-Droid compliant**:
 ```cmd
 .build-tools\build-apk.bat
 ```
-Outputs [`PureTube-v0.3.007-debug.apk`](PureTube-v0.3.007-debug.apk) and [`PureTube-debug.apk`](PureTube-debug.apk) in the project root.
+Outputs [`PureTube-v0.3.007.apk`](PureTube-v0.3.007.apk) and [`PureTube.apk`](PureTube.apk) in the project root.
 
 ### 2. Automated GitHub Actions Release
 Whenever you push a version tag starting with `v`, [`.github/workflows/build-apk.yml`](.github/workflows/build-apk.yml) automatically builds the APK and publishes a **GitHub Release** (which immediately notifies users via PureTube's in-app updater):

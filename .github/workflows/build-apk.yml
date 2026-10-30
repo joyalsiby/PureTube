@@ -27,7 +27,7 @@ jobs:
           VERSION_CODE=$(grep -oP 'versionCode\s*=\s*\K[0-9]+' app/build.gradle.kts)
           echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
           echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
-          echo "apk_name=PureTube-v${VERSION_NAME}-debug.apk" >> $GITHUB_OUTPUT
+          echo "apk_name=PureTube-v${VERSION_NAME}.apk" >> $GITHUB_OUTPUT
           echo "Detected PureTube v${VERSION_NAME} (versionCode ${VERSION_CODE})"
 
       - name: Set up JDK 17
@@ -44,17 +44,17 @@ jobs:
           sed -i 's/\r$//' gradlew
           chmod +x gradlew
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Build Release APK
+        run: ./gradlew assembleRelease --stacktrace
 
       - name: Rename APK to Match Version Number
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk "${{ steps.version.outputs.apk_name }}"
+          cp app/build/outputs/apk/release/app-release.apk "${{ steps.version.outputs.apk_name }}"
 
       - name: Upload Versioned APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PureTube-v${{ steps.version.outputs.version_name }}-debug
+          name: PureTube-v${{ steps.version.outputs.version_name }}
           path: ${{ steps.version.outputs.apk_name }}
 
       - name: Create GitHub Release (on v* tag push)
@@ -65,7 +65,7 @@ jobs:
           body: |
             ### PureTube `v${{ steps.version.outputs.version_name }}` (`versionCode = ${{ steps.version.outputs.version_code }}`)
             - **Direct APK Download:** Attach & install `${{ steps.version.outputs.apk_name }}` below.
-            - **In-Place Upgrade Ready:** Signed with the project's persistent keystore so you can install directly over previous versions without losing watch history.
+            - **In-Place Upgrade Ready:** Signed with the project's persistent keystore so you can install directly over previous versions (or update via the in-app Updater) without losing watch history.
             - See [`PROJECT_LOG.md`](https://github.com/${{ github.repository }}/blob/main/PROJECT_LOG.md) for full changelog details.
           files: |
             ${{ steps.version.outputs.apk_name }}

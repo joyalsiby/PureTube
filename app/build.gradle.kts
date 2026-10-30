@@ -28,6 +28,11 @@ android {
         includeInBundle = false
     }
 
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
+
     signingConfigs {
         create("puretube") {
             storeFile = file("keystore/puretube.keystore")

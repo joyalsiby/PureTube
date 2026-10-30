@@ -87,7 +87,7 @@ object AppUpdateManager {
             // Fallback direct URL if asset list is empty
             if (apkDownloadUrl.isEmpty()) {
                 apkDownloadUrl =
-                    "https://github.com/$GITHUB_OWNER/$GITHUB_REPO/releases/download/$tagName/PureTube-v$remoteVersion-debug.apk"
+                    "https://github.com/$GITHUB_OWNER/$GITHUB_REPO/releases/download/$tagName/PureTube-v$remoteVersion.apk"
             }
 
             val isNewer = isRemoteVersionNewer(currentVersion, remoteVersion)
