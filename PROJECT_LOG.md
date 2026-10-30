@@ -184,3 +184,23 @@ This document tracks everything built, configured, and improved in the **PureTub
 3. **Official PureTube Red Shield SVG Logo & Creator Details ([`assets/logo.svg`](file:///f:/Youtube%20Video%20watching%20app/assets/logo.svg), [`README.md`](file:///f:/Youtube%20Video%20watching%20app/README.md), [`SettingsScreen.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/screens/SettingsScreen.kt)):**
    - Added standalone `assets/logo.svg` (Red Shield + White Play Symbol) rendered at the top of `README.md` and inside GitHub Releases.
    - Added **Joyal Siby** creator section & portfolio links (`joyalsiby.com` and `github.com/joyalsiby`) to both `README.md` and the in-app **Settings -> About & Developer** section.
+
+---
+
+## v0.3.009 — First-Install Interactive Onboarding, Post-Update In-App Release Notes, & Clean Player View Mode Indicator
+
+1. **First-Install Interactive Onboarding ([`OnboardingScreen.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/screens/OnboardingScreen.kt), [`AppPreferences.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/data/AppPreferences.kt), [`MainViewModel.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/MainViewModel.kt), [`MainActivity.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/MainActivity.kt)):**
+   - Added a 4-page Material 3 `HorizontalPager` onboarding flow that launches automatically after first install (and can be replayed anytime via **Settings -> Replay Welcome Onboarding**):
+     - **Step 1 — Welcome to PureTube:** Introduces the 100% ad-free, zero-distraction philosophy (no home feed, no search bar, no Shorts, no recommendations).
+     - **Step 2 — 2 Easy Ways to Watch:** Explains **`Share -> PureTube`** from any app and **`Paste from clipboard`** on the Watch screen, plus a 1-tap **"Configure Default Link Handler"** button to open Android's *"Open by default"* settings.
+     - **Step 3 — Kids & Focus Quick Setup:** Interactive live switches to configure **Start with Kids Screen Lock**, **Auto-Enter Fullscreen on Play**, **Minimal Watch Page**, and **Background Audio Playback** before entering the app.
+     - **Step 4 — Smart Player Gestures & Updates:** Visual guide covering fullscreen Brightness/Volume vertical swipes, two-finger Pinch-to-Zoom (`Zoomed to fill` / `Original`), Multi-Audio (`Original` default), Closed Captions (`CC`), Video Chapters, and 1-tap updates.
+
+2. **In-App Release Notes After Each Update ([`AppReleaseNotes.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/updater/AppReleaseNotes.kt), [`WatchHomeScreen.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/screens/WatchHomeScreen.kt), [`SettingsScreen.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/screens/SettingsScreen.kt)):**
+   - Tracks `lastSeenVersion` in `AppPreferences` and automatically displays a rich **What's New (`vX.X.XXX`) Release Notes** modal dialog inside the app after every update.
+   - Includes structured release highlights for the current version, cached GitHub release notes from in-app updates, and an expandable **Previous Updates** changelog history.
+   - Also accessible anytime by tapping `v0.3.009 · What's New` on the Watch home screen or **Settings -> What's New in v0.3.009 (Release Notes)**.
+
+3. **Removed Red Filled View Indicator Color in Player UI ([`VideoPlayerScreen.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/player/VideoPlayerScreen.kt)):**
+   - Removed the red fill (`YouTubeRed.copy(alpha = 0.85f)`) and red icon tint from the fullscreen Fit / `Zoomed to fill` view mode pill and top-bar icons so the player overlay remains clean and distraction-free.
+   - Bumped version to **`v0.3.009`** (`versionCode = 12`, `versionName = "0.3.009"`).

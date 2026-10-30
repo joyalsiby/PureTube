@@ -24,9 +24,13 @@ data class AppSettings(
     val autoFullscreenOnPlay: Boolean = false, // Open videos directly in fullscreen landscape
     val hideVideoDescription: Boolean = false, // Hide description & stats below player for zero distraction
     val saveWatchHistory: Boolean = true,
-    // Updater Settings
+    // Updater & Onboarding / Release Notes State
     val autoCheckUpdates: Boolean = true,
-    val skippedUpdateVersion: String = ""
+    val skippedUpdateVersion: String = "",
+    val onboardingCompleted: Boolean = false,
+    val lastSeenVersion: String = "",
+    val cachedReleaseNotesVersion: String = "",
+    val cachedReleaseNotesBody: String = ""
 )
 
 class AppPreferences(context: Context) {
@@ -53,7 +57,11 @@ class AppPreferences(context: Context) {
             hideVideoDescription = prefs.getBoolean("hide_video_description", false),
             saveWatchHistory = prefs.getBoolean("save_watch_history", true),
             autoCheckUpdates = prefs.getBoolean("auto_check_updates", true),
-            skippedUpdateVersion = prefs.getString("skipped_update_version", "").orEmpty()
+            skippedUpdateVersion = prefs.getString("skipped_update_version", "").orEmpty(),
+            onboardingCompleted = prefs.getBoolean("onboarding_completed", false),
+            lastSeenVersion = prefs.getString("last_seen_version", "").orEmpty(),
+            cachedReleaseNotesVersion = prefs.getString("cached_release_notes_version", "").orEmpty(),
+            cachedReleaseNotesBody = prefs.getString("cached_release_notes_body", "").orEmpty()
         )
     }
 
@@ -70,8 +78,14 @@ class AppPreferences(context: Context) {
     fun setAutoPipOnHome(enabled: Boolean) = update { putBoolean("auto_pip_on_home", enabled) }
     fun setAutoStartKidsLocked(enabled: Boolean) = update { putBoolean("auto_start_kids_locked", enabled) }
     fun setAutoFullscreenOnPlay(enabled: Boolean) = update { putBoolean("auto_fullscreen_on_play", enabled) }
-    fun setHideVideoDescription(enabled: Boolean) = update { putBoolean("hide_video_description", enabled) }
+    fun setHideVideoDescription(enabled: Boolean) = update { putBoolean("hide_video_description", false.takeIf { !enabled } ?: true) }
     fun setSaveWatchHistory(enabled: Boolean) = update { putBoolean("save_watch_history", enabled) }
     fun setAutoCheckUpdates(enabled: Boolean) = update { putBoolean("auto_check_updates", enabled) }
     fun setSkippedUpdateVersion(version: String) = update { putString("skipped_update_version", version) }
+    fun setOnboardingCompleted(completed: Boolean) = update { putBoolean("onboarding_completed", completed) }
+    fun setLastSeenVersion(version: String) = update { putString("last_seen_version", version) }
+    fun setCachedReleaseNotes(version: String, body: String) = update {
+        putString("cached_release_notes_version", version)
+        putString("cached_release_notes_body", body)
+    }
 }

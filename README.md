@@ -18,7 +18,7 @@
 
 <br />
 
-[**⬇️ Download Latest APK (`v0.3.008`)**](https://github.com/joyalsiby/PureTube/releases/latest) · [**📦 Install via Obtainium / F-Droid**](#-f-droid--obtainium-installation) · [**🛡️ Bypass Play Protect Warning**](#-fixing-the-google-play-protect-scan-warning) · [**🌐 joyalsiby.com**](https://joyalsiby.com) · [**📝 Changelog**](PROJECT_LOG.md)
+[**⬇️ Download Latest APK (`v0.3.009`)**](https://github.com/joyalsiby/PureTube/releases/latest) · [**📦 Install via Obtainium / F-Droid**](#-f-droid--obtainium-installation) · [**🛡️ Bypass Play Protect Warning**](#-fixing-the-google-play-protect-scan-warning) · [**🌐 joyalsiby.com**](https://joyalsiby.com) · [**📝 Changelog**](PROJECT_LOG.md)
 
 </div>
 
@@ -136,7 +136,7 @@ PureTube is 100% F-Droid compliant:
 ```cmd
 .build-tools\build-apk.bat
 ```
-Outputs [`PureTube-v0.3.008.apk`](PureTube-v0.3.008.apk) and [`PureTube.apk`](PureTube.apk) in the project root. Pushing any `v*` tag triggers [`.github/workflows/build-apk.yml`](.github/workflows/build-apk.yml) to automatically compile the release APK, extract the version changelog from [`PROJECT_LOG.md`](PROJECT_LOG.md), and publish a rich GitHub Release.
+Outputs [`PureTube-v0.3.009.apk`](PureTube-v0.3.009.apk) and [`PureTube.apk`](PureTube.apk) in the project root. Pushing any `v*` tag triggers [`.github/workflows/build-apk.yml`](.github/workflows/build-apk.yml) to automatically compile the release APK, extract the version changelog from [`PROJECT_LOG.md`](PROJECT_LOG.md), and publish a rich GitHub Release.
 
 ---
 

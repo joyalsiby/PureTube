@@ -42,7 +42,10 @@ data class MainUiState(
     val updateStatusMessage: String? = null,
     val isDownloadingUpdate: Boolean = false,
     val updateDownloadProgress: Float = 0f,
-    val downloadedApkFile: File? = null
+    val downloadedApkFile: File? = null,
+    // Onboarding & Post-Update Release Notes State
+    val showOnboarding: Boolean = false,
+    val showReleaseNotesDialog: Boolean = false
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -50,14 +53,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as PureTubeApplication
     private val historyDao = app.database.watchHistoryDao()
     private val preferences = app.preferences
+    val currentVersionName: String = AppUpdateManager.getCurrentVersionName(app)
 
     val appSettings: StateFlow<AppSettings> = preferences.settings
 
     private val _uiState = MutableStateFlow(
-        MainUiState(
-            playbackSpeed = preferences.settings.value.defaultPlaybackSpeed,
-            backgroundPlayEnabled = preferences.settings.value.backgroundPlayEnabled
-        )
+        run {
+            val initialSettings = preferences.settings.value
+            val needsOnboarding = !initialSettings.onboardingCompleted
+            val needsReleaseNotes = initialSettings.onboardingCompleted &&
+                initialSettings.lastSeenVersion != currentVersionName
+
+            MainUiState(
+                playbackSpeed = initialSettings.defaultPlaybackSpeed,
+                backgroundPlayEnabled = initialSettings.backgroundPlayEnabled,
+                showOnboarding = needsOnboarding,
+                showReleaseNotesDialog = needsReleaseNotes
+            )
+        }
     )
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
 
@@ -262,6 +275,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun updateAutoCheckUpdates(enabled: Boolean) = preferences.setAutoCheckUpdates(enabled)
 
     // =========================================================================
+    // ONBOARDING & POST-UPDATE RELEASE NOTES
+    // =========================================================================
+
+    fun completeOnboarding() {
+        val lastSeen = preferences.settings.value.lastSeenVersion
+        preferences.setOnboardingCompleted(true)
+        // If this version's release notes haven't been seen yet (e.g. after an update), show them next
+        val shouldShowReleaseNotes = lastSeen != currentVersionName
+        _uiState.update {
+            it.copy(
+                showOnboarding = false,
+                showReleaseNotesDialog = shouldShowReleaseNotes
+            )
+        }
+    }
+
+    fun reopenOnboarding() {
+        _uiState.update { it.copy(showOnboarding = true) }
+    }
+
+    fun openReleaseNotesDialog() {
+        _uiState.update { it.copy(showReleaseNotesDialog = true) }
+    }
+
+    fun dismissReleaseNotesDialog() {
+        preferences.setLastSeenVersion(currentVersionName)
+        _uiState.update { it.copy(showReleaseNotesDialog = false) }
+    }
+
+    // =========================================================================
     // IN-APP UPDATE CHECKER & DOWNLOADER
     // =========================================================================
 
@@ -337,8 +380,15 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // If already downloaded for this version, install immediately
         val existingFile = _uiState.value.downloadedApkFile
         if (existingFile != null && existingFile.exists() && existingFile.name == updateInfo.apkFileName) {
+            if (updateInfo.releaseNotes.isNotBlank()) {
+                preferences.setCachedReleaseNotes(updateInfo.versionName, updateInfo.releaseNotes)
+            }
             AppUpdateManager.installApk(app, existingFile)
             return
+        }
+
+        if (updateInfo.releaseNotes.isNotBlank()) {
+            preferences.setCachedReleaseNotes(updateInfo.versionName, updateInfo.releaseNotes)
         }
 
         _uiState.update {

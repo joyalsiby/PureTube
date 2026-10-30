@@ -59,9 +59,11 @@ import com.puretube.player.extractor.YoutubeStreamExtractor
 import com.puretube.player.ui.MainViewModel
 import com.puretube.player.ui.player.VideoPlayerScreen
 import com.puretube.player.ui.screens.HistoryScreen
+import com.puretube.player.ui.screens.OnboardingScreen
 import com.puretube.player.ui.screens.SettingsScreen
 import com.puretube.player.ui.screens.WatchHomeScreen
 import com.puretube.player.ui.theme.PureTubeTheme
+import com.puretube.player.updater.WhatsNewReleaseNotesDialog
 import kotlin.math.roundToInt
 
 class MainActivity : ComponentActivity() {
@@ -202,6 +204,37 @@ fun PureTubeApp(
             }
         )
         return
+    }
+
+    // First-Install Welcome Onboarding Screen (or when replayed from Settings)
+    if (uiState.showOnboarding && !uiState.isLoading) {
+        OnboardingScreen(
+            settings = appSettings,
+            onUpdateAutoStartKidsLocked = viewModel::updateAutoStartKidsLocked,
+            onUpdateAutoFullscreen = viewModel::updateAutoFullscreenOnPlay,
+            onUpdateHideDescription = viewModel::updateHideVideoDescription,
+            onUpdateBackgroundPlay = viewModel::setBackgroundPlayEnabled,
+            onFinishOnboarding = {
+                viewModel.completeOnboarding()
+            }
+        )
+        return
+    }
+
+    // Post-Update In-App "What's New" Release Notes Dialog
+    if (uiState.showReleaseNotesDialog) {
+        val cachedNotes = if (appSettings.cachedReleaseNotesVersion == viewModel.currentVersionName) {
+            appSettings.cachedReleaseNotesBody.takeIf { it.isNotBlank() }
+        } else {
+            null
+        }
+        WhatsNewReleaseNotesDialog(
+            currentVersion = viewModel.currentVersionName,
+            cachedRemoteNotes = cachedNotes,
+            onDismiss = {
+                viewModel.dismissReleaseNotesDialog()
+            }
+        )
     }
 
     // In-App Update Notification Dialog
@@ -352,6 +385,7 @@ fun PureTubeApp(
                 errorMessage = uiState.errorMessage,
                 availableUpdate = availableUpdate,
                 onUpdateBannerClick = { viewModel.openUpdateDialog() },
+                onReleaseNotesClick = { viewModel.openReleaseNotesDialog() },
                 onUrlChange = viewModel::onUrlChanged,
                 onWatchClick = { url -> viewModel.loadAndPlayUrl(url) },
                 modifier = Modifier.padding(innerPadding)
@@ -390,6 +424,8 @@ fun PureTubeApp(
                 onUpdateSaveHistory = viewModel::updateSaveWatchHistory,
                 onUpdateAutoCheckUpdates = viewModel::updateAutoCheckUpdates,
                 onClearHistory = viewModel::clearAllHistory,
+                onOpenReleaseNotes = { viewModel.openReleaseNotesDialog() },
+                onReopenOnboarding = { viewModel.reopenOnboarding() },
                 modifier = Modifier.padding(innerPadding)
             )
         }

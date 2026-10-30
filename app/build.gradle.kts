@@ -14,8 +14,8 @@ android {
         minSdk = 24
         targetSdk = 35
         // Version format: X.X.XXX (increment the 3-digit patch number unless 1st/2nd part is explicitly requested)
-        versionCode = 11
-        versionName = "0.3.008"
+        versionCode = 12
+        versionName = "0.3.009"
 
         vectorDrawables {
             useSupportLibrary = true

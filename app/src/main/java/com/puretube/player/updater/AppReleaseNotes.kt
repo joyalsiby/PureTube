@@ -1,0 +1,466 @@
+package com.puretube.player.updater
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.BatteryChargingFull
+import androidx.compose.material.icons.rounded.ChildCare
+import androidx.compose.material.icons.rounded.ClosedCaption
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.FitScreen
+import androidx.compose.material.icons.rounded.FormatListBulleted
+import androidx.compose.material.icons.rounded.GraphicEq
+import androidx.compose.material.icons.rounded.NewReleases
+import androidx.compose.material.icons.rounded.PictureInPictureAlt
+import androidx.compose.material.icons.rounded.RocketLaunch
+import androidx.compose.material.icons.rounded.Security
+import androidx.compose.material.icons.rounded.SystemUpdate
+import androidx.compose.material.icons.rounded.TouchApp
+import androidx.compose.material.icons.rounded.Verified
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import com.puretube.player.ui.screens.PureTubeShieldLogo
+
+data class ReleaseHighlightItem(
+    val icon: ImageVector,
+    val title: String,
+    val description: String
+)
+
+data class VersionReleaseNote(
+    val versionName: String,
+    val title: String,
+    val summary: String,
+    val highlights: List<ReleaseHighlightItem>
+)
+
+object AppReleaseNotes {
+
+    val allReleases: List<VersionReleaseNote> = listOf(
+        VersionReleaseNote(
+            versionName = "0.3.009",
+            title = "Welcome Onboarding, In-App Release Notes & Clean Player UI",
+            summary = "A smoother first-install setup experience, automatic What's New release notes after every update, and a cleaner player UI.",
+            highlights = listOf(
+                ReleaseHighlightItem(
+                    icon = Icons.Rounded.RocketLaunch,
+                    title = "First-Install Interactive Onboarding",
+                    description = "New 4-step welcome tour after first install explaining Share-to-PureTube, default link handling, and instant Kids & Focus Mode setup."
+                ),
+                ReleaseHighlightItem(
+                    icon = Icons.Rounded.NewReleases,
+                    title = "In-App Release Notes After Every Update",
+                    description = "Automatically displays What's New release notes right inside PureTube whenever you update to a new version (and anytime from Settings)."
+                ),
+                ReleaseHighlightItem(
+                    icon = Icons.Rounded.FitScreen,
+                    title = "Cleaner Player View Mode Indicator",
+                    description = "Removed the distracting red fill color from the fullscreen Fit / Zoomed-to-fill view indicator pill and top-bar icons for a distraction-free player."
+                )
+            )
+        ),
+        VersionReleaseNote(
+            versionName = "0.3.008",
+            title = "Production Release Builds, Official Shield SVG & Creator Profile",
+            summary = "Optimized production release APK builds (~15.5 MB), rich GitHub release notes, and developer portfolio links.",
+            highlights = listOf(
+                ReleaseHighlightItem(
+                    icon = Icons.Rounded.Verified,
+                    title = "Production Release APK Builds",
+                    description = "Switched permanently to signed production release builds (PureTube-vX.X.XXX.apk) for smaller APK size and fewer Play Protect prompts."
+                ),
+                ReleaseHighlightItem(
+                    icon = Icons.Rounded.Security,
+                    title = "Official PureTube Red Shield Identity",
+                    description = "Added official standalone Red Shield + Play SVG branding and Joyal Siby creator profile links in Settings."
+                )
+            )
+        ),
+        VersionReleaseNote(
+            versionName = "0.3.007",
+            title = "1-Tap In-App Updater, Settings Tab & Kids Parental Controls",
+            summary = "Built-in GitHub release updater, dedicated Settings tab, Kids Screen Lock on startup, and F-Droid compliance.",
+            highlights = listOf(
+                ReleaseHighlightItem(
+                    icon = Icons.Rounded.SystemUpdate,
+                    title = "Built-In 1-Tap APK Updater",
+                    description = "Automatically checks GitHub Releases and downloads + installs updates directly inside PureTube."
+                ),
+                ReleaseHighlightItem(
+                    icon = Icons.Rounded.ChildCare,
+                    title = "Kids & Focus Parental Controls",
+                    description = "Added Auto Kids Screen Lock on startup, Auto-Fullscreen on play, Minimal Distraction-Free Watch Page, and Default Link Handler shortcut."
+                )
+            )
+        ),
+        VersionReleaseNote(
+            versionName = "0.3.006",
+            title = "Video Chapters, Swipe Gestures, Background Play & PiP",
+            summary = "Clickable timestamps, chapter markers on seekbar, fullscreen brightness/volume gestures, and Picture-in-Picture.",
+            highlights = listOf(
+                ReleaseHighlightItem(
+                    icon = Icons.Rounded.FormatListBulleted,
+                    title = "Video Chapters & Clickable Timestamps",
+                    description = "Chapter markers on the seekbar, Chapters bottom sheet, and clickable 01:23 timestamps in descriptions."
+                ),
+                ReleaseHighlightItem(
+                    icon = Icons.Rounded.TouchApp,
+                    title = "Fullscreen Brightness & Volume Swipes",
+                    description = "Swipe vertically on the left for Brightness (0%–100%) or on the right for Volume (0%–100%)."
+                ),
+                ReleaseHighlightItem(
+                    icon = Icons.Rounded.PictureInPictureAlt,
+                    title = "Background Audio & Picture-in-Picture (PiP)",
+                    description = "Keep audio playing with the screen off or float the video in a 16:9 PiP window when pressing Home."
+                )
+            )
+        ),
+        VersionReleaseNote(
+            versionName = "0.3.005",
+            title = "Battery & Thermal Engineering + Expandable Description",
+            summary = "Zero UI recompositions while controls are hidden, hardware H.264 priority, and expandable portrait descriptions.",
+            highlights = listOf(
+                ReleaseHighlightItem(
+                    icon = Icons.Rounded.BatteryChargingFull,
+                    title = "Zero-Recomposition Playback & Smart Wake Lock",
+                    description = "Eliminated background UI polling when player controls are hidden and prioritized hardware AVC1 (H.264) decoding."
+                )
+            )
+        ),
+        VersionReleaseNote(
+            versionName = "0.3.004",
+            title = "Zero-Stall RAM Preloader, Multi-Audio & Closed Captions",
+            summary = "Parallel RAM stream preloading (<1.2s startup), Original audio track default, CC subtitles, and pinch-to-zoom.",
+            highlights = listOf(
+                ReleaseHighlightItem(
+                    icon = Icons.Rounded.AutoAwesome,
+                    title = "Parallel RAM Stream Preloader",
+                    description = "Prefetches initial video and audio segments into RAM with anti-throttling HTTP/2 range requests for instant startup."
+                ),
+                ReleaseHighlightItem(
+                    icon = Icons.Rounded.GraphicEq,
+                    title = "Multi-Audio Track Switcher & Closed Captions (CC)",
+                    description = "Always defaults to the Original audio track first and supports WebVTT/TTML subtitles."
+                )
+            )
+        )
+    )
+
+    fun getReleaseNoteForVersion(versionName: String): VersionReleaseNote {
+        val clean = versionName.removePrefix("v").removePrefix("V").trim()
+        return allReleases.firstOrNull { it.versionName == clean }
+            ?: allReleases.first().copy(versionName = clean)
+    }
+}
+
+@Composable
+fun WhatsNewReleaseNotesDialog(
+    currentVersion: String,
+    cachedRemoteNotes: String? = null,
+    onDismiss: () -> Unit
+) {
+    val currentNote = remember(currentVersion) {
+        AppReleaseNotes.getReleaseNoteForVersion(currentVersion)
+    }
+    val olderReleases = remember(currentVersion) {
+        val clean = currentVersion.removePrefix("v").removePrefix("V").trim()
+        AppReleaseNotes.allReleases.filter { it.versionName != clean }
+    }
+    var showPreviousReleases by remember { mutableStateOf(false) }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 24.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 8.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp)
+            ) {
+                // Header with PureTube Shield Logo + Version Badge
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    PureTubeShieldLogo(modifier = Modifier.size(46.dp))
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Rounded.NewReleases,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "WHAT'S NEW · v${currentNote.versionName}",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Release Notes",
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Bold
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = currentNote.summary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Scrollable Highlights + Optional Remote Notes + Previous Releases
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 380.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    currentNote.highlights.forEach { item ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(14.dp),
+                                verticalAlignment = Alignment.Top
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .background(
+                                            MaterialTheme.colorScheme.primaryContainer,
+                                            CircleShape
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = item.icon,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = item.title,
+                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                            fontWeight = FontWeight.Bold
+                                        ),
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Text(
+                                        text = item.description,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (!cachedRemoteNotes.isNullOrBlank()) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(18.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainer
+                            )
+                        ) {
+                            Column(modifier = Modifier.padding(14.dp)) {
+                                Text(
+                                    text = "Additional Release Details",
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(
+                                    text = cachedRemoteNotes,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+
+                    // Expandable Previous Releases Section
+                    if (olderReleases.isNotEmpty()) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { showPreviousReleases = !showPreviousReleases },
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainer
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (showPreviousReleases) {
+                                        "Hide previous release notes"
+                                    } else {
+                                        "View previous updates (${olderReleases.size} releases)"
+                                    },
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontWeight = FontWeight.SemiBold
+                                    ),
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Icon(
+                                    imageVector = if (showPreviousReleases) {
+                                        Icons.Rounded.ExpandLess
+                                    } else {
+                                        Icons.Rounded.ExpandMore
+                                    },
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+
+                        AnimatedVisibility(visible = showPreviousReleases) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                olderReleases.forEach { oldRelease ->
+                                    Card(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        shape = RoundedCornerShape(16.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                                        )
+                                    ) {
+                                        Column(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(14.dp)
+                                        ) {
+                                            Text(
+                                                text = "v${oldRelease.versionName} — ${oldRelease.title}",
+                                                style = MaterialTheme.typography.labelLarge.copy(
+                                                    fontWeight = FontWeight.Bold
+                                                ),
+                                                color = MaterialTheme.colorScheme.onSurface
+                                            )
+                                            Spacer(modifier = Modifier.height(6.dp))
+                                            oldRelease.highlights.forEachIndexed { idx, hl ->
+                                                if (idx > 0) {
+                                                    HorizontalDivider(
+                                                        modifier = Modifier.padding(vertical = 6.dp),
+                                                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+                                                    )
+                                                }
+                                                Text(
+                                                    text = "• ${hl.title}: ${hl.description}",
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(25.dp)
+                ) {
+                    Text(
+                        text = "Got It, Let's Watch",
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontWeight = FontWeight.Bold
+                        )
+                    )
+                }
+            }
+        }
+    }
+}

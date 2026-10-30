@@ -1058,11 +1058,7 @@ fun VideoPlayerScreen(
                                     Icon(
                                         imageVector = Icons.Rounded.GraphicEq,
                                         contentDescription = "Audio track",
-                                        tint = if (selectedAudioTrack != null && !selectedAudioTrack.isOriginal) {
-                                            YouTubeRed
-                                        } else {
-                                            Color.White
-                                        },
+                                        tint = Color.White,
                                         modifier = Modifier.size(22.dp)
                                     )
                                 }
@@ -1108,7 +1104,7 @@ fun VideoPlayerScreen(
                                             Icons.Rounded.FitScreen
                                         },
                                         contentDescription = "Toggle Fit or Zoom to fill",
-                                        tint = if (isZoomedToFill) YouTubeRed else Color.White,
+                                        tint = Color.White,
                                         modifier = Modifier.size(22.dp)
                                     )
                                 }
@@ -1442,7 +1438,7 @@ fun VideoPlayerScreen(
                                         FullscreenQuickPill(
                                             icon = if (isZoomedToFill) Icons.Rounded.CropFree else Icons.Rounded.FitScreen,
                                             label = if (isZoomedToFill) "Zoomed to fill" else "Original (Fit)",
-                                            isActive = isZoomedToFill,
+                                            isActive = false,
                                             onClick = {
                                                 isZoomedToFill = !isZoomedToFill
                                                 zoomFeedbackText = if (isZoomedToFill) "Zoomed to fill" else "Original"
@@ -2392,7 +2388,7 @@ private fun FullscreenQuickPill(
         onClick = onClick,
         shape = RoundedCornerShape(16.dp),
         color = if (isActive) {
-            YouTubeRed.copy(alpha = 0.85f)
+            Color.White.copy(alpha = 0.26f)
         } else {
             Color.White.copy(alpha = 0.16f)
         }

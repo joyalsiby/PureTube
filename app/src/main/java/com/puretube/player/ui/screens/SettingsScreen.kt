@@ -41,6 +41,7 @@ import androidx.compose.material.icons.rounded.OpenInBrowser
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.rounded.PictureInPictureAlt
+import androidx.compose.material.icons.rounded.RocketLaunch
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material.icons.rounded.Speed
 import androidx.compose.material.icons.rounded.SystemUpdate
@@ -103,6 +104,8 @@ fun SettingsScreen(
     onUpdateSaveHistory: (Boolean) -> Unit,
     onUpdateAutoCheckUpdates: (Boolean) -> Unit,
     onClearHistory: () -> Unit,
+    onOpenReleaseNotes: () -> Unit = {},
+    onReopenOnboarding: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -155,11 +158,12 @@ fun SettingsScreen(
             )
 
             Surface(
+                onClick = onOpenReleaseNotes,
                 shape = RoundedCornerShape(12.dp),
                 color = MaterialTheme.colorScheme.primaryContainer
             ) {
                 Text(
-                    text = "v$currentVersion",
+                    text = "v$currentVersion · What's New",
                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
@@ -331,6 +335,24 @@ fun SettingsScreen(
                         subtitle = "Notify automatically when a new PureTube version is released on GitHub",
                         checked = settings.autoCheckUpdates,
                         onCheckedChange = onUpdateAutoCheckUpdates
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    SettingsActionItem(
+                        icon = Icons.Rounded.NewReleases,
+                        title = "What's New in v$currentVersion (Release Notes)",
+                        subtitle = "View in-app release notes & changelog history",
+                        onClick = onOpenReleaseNotes
+                    )
+
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+
+                    SettingsActionItem(
+                        icon = Icons.Rounded.RocketLaunch,
+                        title = "Replay Welcome Onboarding",
+                        subtitle = "Take the PureTube quick-start tour & Kids Mode setup again",
+                        onClick = onReopenOnboarding
                     )
                 }
             }

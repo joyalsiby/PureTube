@@ -63,6 +63,7 @@ fun WatchHomeScreen(
     errorMessage: String?,
     availableUpdate: ReleaseUpdateInfo? = null,
     onUpdateBannerClick: () -> Unit = {},
+    onReleaseNotesClick: () -> Unit = {},
     onUrlChange: (String) -> Unit,
     onWatchClick: (String) -> Unit,
     modifier: Modifier = Modifier
@@ -279,18 +280,21 @@ fun WatchHomeScreen(
             }
         }
 
-        // Subtle version indicator at the bottom of the screen (vX.X.XXX format)
+        // Subtle version indicator at the bottom of the screen (vX.X.XXX format) — tap to view Release Notes
         val versionName = runCatching {
             context.packageManager.getPackageInfo(context.packageName, 0).versionName
-        }.getOrNull() ?: "0.3.007"
+        }.getOrNull() ?: "0.3.009"
 
         Text(
-            text = "v$versionName",
+            text = "v$versionName · What's New",
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f),
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 12.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .clickable(onClick = onReleaseNotesClick)
+                .padding(horizontal = 10.dp, vertical = 4.dp)
         )
     }
 }
