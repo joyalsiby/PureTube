@@ -96,7 +96,7 @@ object AppReleaseNotes {
             summary = "Added official distributionSha256Sum verification to the Gradle wrapper for F-Droid compliance and reproducible build security.",
             highlights = listOf(
                 ReleaseHighlightItem(
-                    icon = Icons.Rounded.VerifiedUser,
+                    icon = Icons.Rounded.Security,
                     title = "F-Droid & Reproducible Build Security",
                     description = "Configured distributionSha256Sum in gradle-wrapper.properties to verify Gradle distribution integrity against tampering, meeting F-Droid inclusion requirements."
                 )
