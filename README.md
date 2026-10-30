@@ -18,7 +18,7 @@
 
 <br />
 
-[**⬇️ Download Latest APK (`v0.3.011`)**](https://github.com/joyalsiby/PureTube/releases/latest) · [**📦 Install via Obtainium / F-Droid**](#-f-droid--obtainium-installation) · [**🛡️ Bypass Play Protect Warning**](#-fixing-the-google-play-protect-scan-warning) · [**🌐 joyalsiby.com**](https://joyalsiby.com) · [**📝 Changelog**](PROJECT_LOG.md)
+[**⬇️ Download Latest APK (`v0.3.012`)**](https://github.com/joyalsiby/PureTube/releases/latest) · [**📦 Install via Obtainium / F-Droid**](#-f-droid--obtainium-installation) · [**🛡️ Bypass Play Protect Warning**](#-fixing-the-google-play-protect-scan-warning) · [**🌐 joyalsiby.com**](https://joyalsiby.com) · [**📝 Changelog**](PROJECT_LOG.md)
 
 </div>
 

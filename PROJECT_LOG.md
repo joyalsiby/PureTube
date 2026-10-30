@@ -207,6 +207,15 @@ This document tracks everything built, configured, and improved in the **PureTub
 
 ---
 
+## v0.3.012 — Gradle Wrapper SHA-256 Integrity Verification (F-Droid RFP Compliance)
+
+1. **F-Droid Inclusion Compliance & Supply Chain Security (`gradle/wrapper/gradle-wrapper.properties`):**
+   - Configured official `distributionSha256Sum = d725d707bfabd4dfdc958c624003b3c80accc03f7037b5122c4b1d0ef15cecab` for `gradle-8.9-bin.zip`.
+   - Resolves F-Droid RFP issue `#4706` bot warning `insecure-gradlew`, ensuring Gradle distribution downloads are cryptographically verified against tampering and MitM attacks.
+   - Bumped version to **`v0.3.012`** (`versionCode = 15`, `versionName = "0.3.012"`).
+
+---
+
 ## v0.3.011 — Media Notification Banner & Control Panel Indicator, Closeable PiP (Bg Play Off by Default), Toddler-Proof Screen Unlock, Playlists, Long-Press 2x Speed, Single-Video Loop, Smart Clipboard Card & History Search
 
 1. **Media Notification Banner, Quick Settings Control Panel Indicator & Closeable PiP ([`MediaPlaybackNotificationManager.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/player/MediaPlaybackNotificationManager.kt), [`VideoPlayerScreen.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/ui/player/VideoPlayerScreen.kt), [`MainActivity.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/MainActivity.kt), [`AppPreferences.kt`](file:///f:/Youtube%20Video%20watching%20app/app/src/main/java/com/puretube/player/data/AppPreferences.kt)):**

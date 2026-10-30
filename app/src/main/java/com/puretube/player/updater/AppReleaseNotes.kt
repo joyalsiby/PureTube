@@ -91,6 +91,18 @@ object AppReleaseNotes {
 
     val allReleases: List<VersionReleaseNote> = listOf(
         VersionReleaseNote(
+            versionName = "0.3.012",
+            title = "Gradle Wrapper SHA-256 Integrity Verification for F-Droid",
+            summary = "Added official distributionSha256Sum verification to the Gradle wrapper for F-Droid compliance and reproducible build security.",
+            highlights = listOf(
+                ReleaseHighlightItem(
+                    icon = Icons.Rounded.VerifiedUser,
+                    title = "F-Droid & Reproducible Build Security",
+                    description = "Configured distributionSha256Sum in gradle-wrapper.properties to verify Gradle distribution integrity against tampering, meeting F-Droid inclusion requirements."
+                )
+            )
+        ),
+        VersionReleaseNote(
             versionName = "0.3.011",
             title = "Media Notification & Closeable PiP, Playlists, Toddler Lock, 2x Hold & More",
             summary = "YouTube-style media notification & control panel playing indicator, closeable PiP with Background Play off by default, toddler-proof screen unlock, playlists, 2x speed hold, loop toggle, clipboard card & history search.",
