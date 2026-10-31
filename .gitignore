@@ -10,8 +10,12 @@ build/
 .build-tools/
 !gradle/wrapper/gradle-wrapper.jar
 
-# Local Environment & SDK Paths (Machine-specific)
+# Local Environment & SDK Paths & Private Signing Keys (Machine-specific)
 local.properties
+keystore.properties
+*.keystore
+*.jks
+app/keystore/
 
 # Compiled Android Binaries (Uploaded via GitHub Releases / CI Artifacts instead of Git history)
 *.apk

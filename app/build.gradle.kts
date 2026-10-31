@@ -1,9 +1,24 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
 }
+
+val keystorePropsFile = rootProject.file("keystore.properties")
+val keystoreProps = Properties().apply {
+    if (keystorePropsFile.exists()) {
+        keystorePropsFile.inputStream().use { load(it) }
+    }
+}
+
+val ksPath = System.getenv("KEYSTORE_PATH") ?: keystoreProps.getProperty("storeFile")
+val ksPassword = System.getenv("KEYSTORE_PASSWORD") ?: keystoreProps.getProperty("storePassword")
+val ksKeyAlias = System.getenv("KEY_ALIAS") ?: keystoreProps.getProperty("keyAlias")
+val ksKeyPassword = System.getenv("KEY_PASSWORD") ?: keystoreProps.getProperty("keyPassword")
+val hasReleaseKeystore = !ksPath.isNullOrBlank() && rootProject.file(ksPath).exists() && !ksPassword.isNullOrBlank()
 
 android {
     namespace = "com.puretube.player"
@@ -34,25 +49,27 @@ android {
     }
 
     signingConfigs {
-        create("puretube") {
-            storeFile = file("keystore/puretube.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
-            enableV1Signing = true
-            enableV2Signing = true
-            enableV3Signing = true
-            enableV4Signing = true
+        if (hasReleaseKeystore) {
+            create("puretube") {
+                storeFile = rootProject.file(ksPath!!)
+                storePassword = ksPassword
+                keyAlias = ksKeyAlias
+                keyPassword = ksKeyPassword ?: ksPassword
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = true
+            }
         }
     }
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("puretube")
+            signingConfig = if (hasReleaseKeystore) signingConfigs.getByName("puretube") else signingConfigs.getByName("debug")
         }
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("puretube")
+            signingConfig = if (hasReleaseKeystore) signingConfigs.getByName("puretube") else signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
